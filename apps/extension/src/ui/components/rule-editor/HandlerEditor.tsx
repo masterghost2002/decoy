@@ -11,6 +11,7 @@ import {
   type LoadedFile,
 } from '@/ui/components/ui/file-loader';
 import { HelpPopover } from '@/ui/components/ui/help-popover';
+import { CodeEditor } from '@/ui/components/ui/code-editor';
 import { Input, Textarea } from '@/ui/components/ui/input';
 import { useToast } from '@/ui/components/ui/toast';
 import { useHandlerRunner } from '@/ui/hooks/useHandlerRunner';
@@ -74,7 +75,7 @@ export function HandlerEditor({
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <Label htmlFor="mocksmith-handler-code">Handler</Label>
+            <Label htmlFor="decoy-handler-code">Handler</Label>
             <HelpPopover title="What a handler is given" side="bottom">
               <p>
                 The body of a function called with <code>req</code>, <code>res</code>,{' '}
@@ -126,13 +127,13 @@ export function HandlerEditor({
         </div>
 
         <div {...drop.handlers} className={cn('flex flex-col rounded-lg', dropRing(drop.over))}>
-          <Textarea
-            id="mocksmith-handler-code"
+          <CodeEditor
+            id="decoy-handler-code"
             rows={14}
+            language="js"
             value={code}
-            onChange={(event) => {
-              onChangeCode(event.target.value);
-            }}
+            onValueChange={onChangeCode}
+            aria-label="Handler code"
             placeholder={'return res.status(200).json({ ok: true });'}
             className="min-h-[12rem]"
           />

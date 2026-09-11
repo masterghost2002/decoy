@@ -13,7 +13,7 @@
  *    Radix defaults to `document.body`, which is outside the shadow root and so
  *    outside every stylesheet the panel has -- an unstyled menu in the page.
  *  - the **shortcut root** is what keyboard shortcuts listen on. Bound to
- *    `window` inside a page, Mocksmith would eat the host app's ⌘K and ⌘S.
+ *    `window` inside a page, Decoy would eat the host app's ⌘K and ⌘S.
  *
  * Module state rather than context because these are set once, during bootstrap,
  * before the first render -- and a context would have to be threaded through

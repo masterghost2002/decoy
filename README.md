@@ -1,11 +1,11 @@
-# Mocksmith
+# Decoy
 
 Mock any browser request without touching your code.
 
 Front-end work stalls in two places: waiting for an endpoint that is not deployed yet, and
 reproducing the failure cases — a 404, a 500, a 30-second response, a dropped connection. Today
 that usually means editing the app to throw on purpose, then remembering to take it out again.
-Mocksmith moves that into the browser, where it belongs: match a request by url, answer it with
+Decoy moves that into the browser, where it belongs: match a request by url, answer it with
 whatever status, body, headers or failure you want, and flip it off when you are done.
 
 **Status: slice 1.** `fetch` and `XMLHttpRequest` are fully intercepted and verified end to end.
@@ -29,7 +29,7 @@ change up.
 ## How it works
 
 Mocking every kind of browser request needs more than one mechanism, and the mechanisms have
-genuinely different capabilities. Rather than pretend otherwise, Mocksmith layers them:
+genuinely different capabilities. Rather than pretend otherwise, Decoy layers them:
 
 | Layer | Covers | Can synthesize a status + body? |
 | --- | --- | --- |
@@ -180,7 +180,7 @@ Some deliberate decisions worth knowing:
   toast, and both are capped: every rule lives in one `chrome.storage.local` key, so a dropped-in
   log file is not allowed to grow the config past the point where nothing can be saved.
 - **Delays interact with client timeouts properly.** A mocked XHR never touches the network, so its
-  native `timeout` would never fire; Mocksmith emulates it. Set `xhr.timeout = 300` against a
+  native `timeout` would never fire; Decoy emulates it. Set `xhr.timeout = 300` against a
   1500 ms mock and you get a real `timeout` event.
 - **`responseText` throws for binary response types**, exactly as the platform does. A mock that is
   more forgiving than the network hides bugs instead of finding them.
@@ -274,7 +274,7 @@ scrolling regions, so they hold still while the form between them is being read.
 
 ### Answering "is it working?"
 
-Mocksmith intervenes in someone else's page, so its first job on every surface is evidence —
+Decoy intervenes in someone else's page, so its first job on every surface is evidence —
 configuration state is not evidence. Four signals, at four distances:
 
 | Distance | Signal |
@@ -390,7 +390,7 @@ Honest list, so nobody debugs a limitation as if it were a bug:
 a host page can observe the config pushed to it and the traffic reported back. The page already
 made every request being reported, and a forged config message could only change how that page's
 own requests are answered — no cross-origin reach and no extension privilege. It is worth knowing
-before you enable Mocksmith on a page you do not trust.
+before you enable Decoy on a page you do not trust.
 
 The extension asks for `storage`, `scripting`, and `<all_urls>` host access, and nothing else.
 `<all_urls>` is inherent: a tool that mocks any request has to be able to run on any page.

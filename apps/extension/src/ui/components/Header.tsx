@@ -1,19 +1,33 @@
-import { ExternalLink, Monitor, Moon, PictureInPicture2, Sun, X } from 'lucide-react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import {
+  ChevronsRight,
+  ExternalLink,
+  Monitor,
+  Moon,
+  PictureInPicture2,
+  Sun,
+  X,
+} from "lucide-react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 
-import { Button } from '@/ui/components/ui/button';
-import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from '@/ui/components/ui/menu';
-import { Switch } from '@/ui/components/ui/switch';
-import { Tooltip } from '@/ui/components/ui/tooltip';
-import { openFullPage } from '@/ui/lib/messaging';
-import { THEME_CHOICES, type ThemeChoice } from '@/ui/hooks/useTheme';
-import { cn } from '@/ui/lib/utils';
+import { Button } from "@/ui/components/ui/button";
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuLabel,
+  MenuTrigger,
+} from "@/ui/components/ui/menu";
+import { Switch } from "@/ui/components/ui/switch";
+import { Tooltip } from "@/ui/components/ui/tooltip";
+import { openFullPage } from "@/ui/lib/messaging";
+import { THEME_CHOICES, type ThemeChoice } from "@/ui/hooks/useTheme";
+import { cn } from "@/ui/lib/utils";
 
 const THEME_ICON = { system: Monitor, light: Sun, dark: Moon } as const;
 const THEME_LABEL: Record<ThemeChoice, string> = {
-  system: 'Match the system',
-  light: 'Light',
-  dark: 'Dark',
+  system: "Match the system",
+  light: "Light",
+  dark: "Dark",
 };
 
 export interface HeaderProps {
@@ -27,6 +41,12 @@ export interface HeaderProps {
   onOpenPanel?: () => void;
   /** Floating panel only: takes it back off the page. */
   onClose?: () => void;
+  /**
+   * Floating panel only: folds it away to a button at the edge of the page.
+   * Distinct from closing, which discards the panel entirely -- collapsing
+   * keeps where it was, how big it was, and which rule was open.
+   */
+  onCollapse?: () => void;
   /** Floating panel only: makes this bar the thing you drag the panel by. */
   onDragPointerDown?: (event: ReactPointerEvent<HTMLElement>) => void;
 }
@@ -40,6 +60,7 @@ export function Header({
   onThemeChange,
   onOpenPanel,
   onClose,
+  onCollapse,
   onDragPointerDown,
 }: HeaderProps) {
   const ThemeIcon = THEME_ICON[theme];
@@ -50,50 +71,65 @@ export function Header({
       onPointerDown={(event) => {
         // Only the bar itself drags. Starting a drag from the master switch
         // would mean the panel lurched every time somebody paused mocking.
-        if (event.target instanceof Element && event.target.closest('button, input, [role]')) {
+        if (
+          event.target instanceof Element &&
+          event.target.closest("button, input, [role]")
+        ) {
           return;
         }
         onDragPointerDown?.(event);
       }}
       className={cn(
-        'flex shrink-0 items-center gap-2.5 border-b border-hairline bg-surface px-3.5 py-2.5',
-        draggable && 'cursor-grab touch-none select-none active:cursor-grabbing',
+        "flex shrink-0 items-center gap-2.5 border-b border-hairline bg-surface px-3.5 py-2.5",
+        draggable &&
+          "cursor-grab touch-none select-none active:cursor-grabbing",
       )}
     >
       {/* The real toolbar icon, so the surface and the browser chrome match. */}
       <img
-        src={chrome.runtime.getURL('icons/icon-32.png')}
+        src={chrome.runtime.getURL("icons/icon-32.png")}
         alt=""
         aria-hidden
         draggable={false}
         className="size-[18px] rounded"
       />
-      <h1 className="text-[16.5px] font-semibold tracking-[-0.02em]">Mocksmith</h1>
+      <h1 className="text-[16.5px] font-semibold tracking-[-0.02em]">
+        Decoy
+      </h1>
 
       <div className="flex-1" />
 
       {/* Spelled out, because colour alone must not carry it -- and gold as
-          *type* has to come from the typographic gold, not the fill gold. */}
+       *type* has to come from the typographic gold, not the fill gold. */}
       <span
-        className={cn('eyebrow flex items-center gap-1.5', enabled && 'text-gold-text')}
+        className={cn(
+          "eyebrow flex items-center gap-1.5",
+          enabled && "text-gold-text",
+        )}
         aria-live="polite"
       >
-        {enabled ? <span aria-hidden className="size-[7px] rounded-full bg-gold" /> : null}
+        {enabled ? (
+          <span aria-hidden className="size-[7px] rounded-full bg-gold" />
+        ) : null}
         {enabled
           ? enabledRuleCount === 0
-            ? 'On · no rules'
+            ? "On · no rules"
             : `On · ${String(enabledRuleCount)} active`
-          : 'Paused'}
+          : "Paused"}
       </span>
       <Switch
         checked={enabled}
         onCheckedChange={onToggle}
-        aria-label={enabled ? 'Pause all mocking' : 'Resume mocking'}
+        aria-label={enabled ? "Pause all mocking" : "Resume mocking"}
       />
 
       <Menu>
         <MenuTrigger asChild>
-          <Button size="icon-sm" variant="ghost" aria-label={`Theme: ${THEME_LABEL[theme]}`}>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={`Theme: ${THEME_LABEL[theme]}`}
+          >
             <ThemeIcon />
           </Button>
         </MenuTrigger>
@@ -107,7 +143,7 @@ export function Header({
                 onSelect={() => {
                   onThemeChange(choice);
                 }}
-                className={cn(choice === theme && 'bg-wash')}
+                className={cn(choice === theme && "bg-wash")}
               >
                 <Icon />
                 {THEME_LABEL[choice]}
@@ -123,7 +159,7 @@ export function Header({
             size="icon-sm"
             variant="ghost"
             onClick={onOpenPanel}
-            aria-label="Open Mocksmith as a floating panel over this page"
+            aria-label="Open Decoy as a floating panel over this page"
           >
             <PictureInPicture2 />
           </Button>
@@ -136,9 +172,22 @@ export function Header({
             size="icon-sm"
             variant="ghost"
             onClick={openFullPage}
-            aria-label="Open Mocksmith in a full tab"
+            aria-label="Open Decoy in a full tab"
           >
             <ExternalLink />
+          </Button>
+        </Tooltip>
+      ) : null}
+
+      {onCollapse !== undefined ? (
+        <Tooltip label="Collapse out of the way">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={onCollapse}
+            aria-label="Collapse the Decoy panel"
+          >
+            <ChevronsRight />
           </Button>
         </Tooltip>
       ) : null}
@@ -149,7 +198,7 @@ export function Header({
             size="icon-sm"
             variant="ghost"
             onClick={onClose}
-            aria-label="Close the Mocksmith panel"
+            aria-label="Close the Decoy panel"
           >
             <X />
           </Button>

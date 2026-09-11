@@ -4,7 +4,7 @@ import { createId } from './id.js';
 /** Bumped only for breaking shape changes; additive fields do not need a bump. */
 export const CONFIG_VERSION = 1;
 
-export interface MocksmithConfig {
+export interface DecoyConfig {
   version: number;
   /** Master switch. When false nothing is intercepted, on any tab. */
   enabled: boolean;
@@ -12,7 +12,7 @@ export interface MocksmithConfig {
   rules: MockRule[];
 }
 
-export function createDefaultConfig(): MocksmithConfig {
+export function createDefaultConfig(): DecoyConfig {
   return { version: CONFIG_VERSION, enabled: true, rules: [] };
 }
 
@@ -20,7 +20,7 @@ export function createDefaultConfig(): MocksmithConfig {
  * Seeded on first install. The rule is disabled, so it changes no behaviour, but
  * it shows the shape of a rule better than an empty list does.
  */
-export function createStarterConfig(now: number): MocksmithConfig {
+export function createStarterConfig(now: number): DecoyConfig {
   const example: MockRule = {
     id: createId('rule'),
     name: 'Example: /api/users returns 404',

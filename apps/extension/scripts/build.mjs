@@ -25,13 +25,13 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const watch = process.argv.includes('--watch');
 
 const SCRIPT_TARGETS = [
-  { name: 'background', entry: 'src/background/index.ts', globalName: 'MocksmithBackground' },
-  { name: 'bridge', entry: 'src/content/bridge.ts', globalName: 'MocksmithBridge' },
-  { name: 'injected', entry: 'src/injected/main.ts', globalName: 'MocksmithInjected' },
+  { name: 'background', entry: 'src/background/index.ts', globalName: 'DecoyBackground' },
+  { name: 'bridge', entry: 'src/content/bridge.ts', globalName: 'DecoyBridge' },
+  { name: 'injected', entry: 'src/injected/main.ts', globalName: 'DecoyInjected' },
   // The handler sandbox. A classic script rather than a module, because its
   // page has an opaque origin and a module fetch from one has to satisfy CORS
   // even for the extension's own files.
-  { name: 'sandbox', entry: 'src/sandbox/main.ts', globalName: 'MocksmithSandbox' },
+  { name: 'sandbox', entry: 'src/sandbox/main.ts', globalName: 'DecoySandbox' },
 ];
 
 async function buildHtmlSurfaces() {
@@ -70,7 +70,7 @@ async function buildPanel() {
       lib: {
         entry: path.join(root, 'src/panel/main.tsx'),
         formats: ['iife'],
-        name: 'MocksmithPanel',
+        name: 'DecoyPanel',
         fileName: () => 'panel.js',
         cssFileName: 'panel',
       },
@@ -120,4 +120,4 @@ for (const target of SCRIPT_TARGETS) {
 }
 await buildPanel();
 
-console.log(watch ? 'mocksmith: watching for changes' : 'mocksmith: build complete -> dist/');
+console.log(watch ? 'decoy: watching for changes' : 'decoy: build complete -> dist/');

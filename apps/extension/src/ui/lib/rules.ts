@@ -6,7 +6,7 @@ import {
   formatJson,
   type MethodPattern,
   type MockRule,
-  type MocksmithConfig,
+  type DecoyConfig,
   type ResponseBody,
   type ResponseHeader,
   type TrafficEntry,
@@ -18,11 +18,11 @@ import {
  * priority model -- stays testable.
  */
 
-export function setMasterEnabled(config: MocksmithConfig, enabled: boolean): MocksmithConfig {
+export function setMasterEnabled(config: DecoyConfig, enabled: boolean): DecoyConfig {
   return { ...config, enabled };
 }
 
-export function upsertRule(config: MocksmithConfig, rule: MockRule, now: number): MocksmithConfig {
+export function upsertRule(config: DecoyConfig, rule: MockRule, now: number): DecoyConfig {
   const stamped: MockRule = { ...rule, updatedAt: now };
   const index = config.rules.findIndex((candidate) => candidate.id === rule.id);
 
@@ -35,16 +35,16 @@ export function upsertRule(config: MocksmithConfig, rule: MockRule, now: number)
   return { ...config, rules };
 }
 
-export function removeRule(config: MocksmithConfig, ruleId: string): MocksmithConfig {
+export function removeRule(config: DecoyConfig, ruleId: string): DecoyConfig {
   return { ...config, rules: config.rules.filter((rule) => rule.id !== ruleId) };
 }
 
 export function setRuleEnabled(
-  config: MocksmithConfig,
+  config: DecoyConfig,
   ruleId: string,
   enabled: boolean,
   now: number,
-): MocksmithConfig {
+): DecoyConfig {
   return {
     ...config,
     rules: config.rules.map((rule) =>
@@ -55,10 +55,10 @@ export function setRuleEnabled(
 
 /** Moves a rule by `offset` positions, clamped to the ends of the list. */
 export function moveRule(
-  config: MocksmithConfig,
+  config: DecoyConfig,
   ruleId: string,
   offset: number,
-): MocksmithConfig {
+): DecoyConfig {
   const index = config.rules.findIndex((rule) => rule.id === ruleId);
   if (index === -1) return config;
 
@@ -78,10 +78,10 @@ export function moveRule(
  * rather than an offset.
  */
 export function moveRuleToIndex(
-  config: MocksmithConfig,
+  config: DecoyConfig,
   ruleId: string,
   index: number,
-): MocksmithConfig {
+): DecoyConfig {
   const current = config.rules.findIndex((rule) => rule.id === ruleId);
   if (current === -1) return config;
   const target = Math.min(Math.max(index, 0), config.rules.length - 1);
@@ -89,7 +89,7 @@ export function moveRuleToIndex(
 }
 
 /** Promotes a rule to first position, where it beats everything below it. */
-export function moveRuleToTop(config: MocksmithConfig, ruleId: string): MocksmithConfig {
+export function moveRuleToTop(config: DecoyConfig, ruleId: string): DecoyConfig {
   const index = config.rules.findIndex((rule) => rule.id === ruleId);
   if (index <= 0) return config;
   return moveRule(config, ruleId, -index);
@@ -97,10 +97,10 @@ export function moveRuleToTop(config: MocksmithConfig, ruleId: string): Mocksmit
 
 /** Inserts a copy directly below the original, disabled so it cannot surprise. */
 export function duplicateRule(
-  config: MocksmithConfig,
+  config: DecoyConfig,
   ruleId: string,
   now: number,
-): { config: MocksmithConfig; newRuleId: string | null } {
+): { config: DecoyConfig; newRuleId: string | null } {
   const index = config.rules.findIndex((rule) => rule.id === ruleId);
   const original = config.rules[index];
   if (original === undefined) return { config, newRuleId: null };
@@ -119,7 +119,7 @@ export function duplicateRule(
   return { config: { ...config, rules }, newRuleId: copy.id };
 }
 
-export function countEnabledRules(config: MocksmithConfig): number {
+export function countEnabledRules(config: DecoyConfig): number {
   return config.rules.reduce((total, rule) => (rule.enabled ? total + 1 : total), 0);
 }
 

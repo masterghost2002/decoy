@@ -1,4 +1,4 @@
-import type { MocksmithConfig } from './config.js';
+import type { DecoyConfig } from './config.js';
 import type { RuleStats } from './stats.js';
 import type { TrafficEntry } from './traffic.js';
 
@@ -8,7 +8,7 @@ import type { TrafficEntry } from './traffic.js';
 
 export type ExtensionMessage =
   | { type: 'config:get' }
-  | { type: 'config:replace'; config: MocksmithConfig }
+  | { type: 'config:replace'; config: DecoyConfig }
   | { type: 'traffic:list' }
   | { type: 'traffic:clear' }
   | { type: 'stats:get' }
@@ -39,7 +39,7 @@ export type ExtensionResponse =
   | {
       ok: true;
       kind: 'config';
-      config: MocksmithConfig;
+      config: DecoyConfig;
       /**
        * Rules the worker refused to store. Validation runs on every write,
        * including the UI's own, and a rule that fails it is dropped so one bad
@@ -72,7 +72,7 @@ export type ExtensionResponse =
  * UI surface; traffic goes only to the UI, since no page needs it.
  */
 export type ExtensionEvent =
-  | { type: 'config:changed'; config: MocksmithConfig }
+  | { type: 'config:changed'; config: DecoyConfig }
   | { type: 'traffic:added'; entries: TrafficEntry[] }
   | { type: 'traffic:body'; id: string; body: string | null; truncated: boolean }
   | { type: 'stats:changed'; stats: RuleStats };
@@ -86,13 +86,13 @@ export type ExtensionEvent =
  * `window` with the page, so anything arriving without the tag is someone
  * else's traffic and must be ignored.
  */
-export const PAGE_BRIDGE_CHANNEL = 'mocksmith.bridge.v1';
+export const PAGE_BRIDGE_CHANNEL = 'decoy.bridge.v1';
 
 export type BridgeToPageMessage = {
   channel: typeof PAGE_BRIDGE_CHANNEL;
   direction: 'to-page';
   kind: 'config';
-  config: MocksmithConfig;
+  config: DecoyConfig;
   /**
    * Where the handler sandbox lives. An extension url, which only the isolated
    * world can ask for -- `chrome.runtime` does not exist in the page -- so it

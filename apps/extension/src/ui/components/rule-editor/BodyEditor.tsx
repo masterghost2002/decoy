@@ -13,6 +13,7 @@ import {
   useFileDrop,
   type LoadedFile,
 } from '@/ui/components/ui/file-loader';
+import { CodeEditor } from '@/ui/components/ui/code-editor';
 import { Input, Select, Textarea } from '@/ui/components/ui/input';
 import { useToast } from '@/ui/components/ui/toast';
 import { cn } from '@/ui/lib/utils';
@@ -301,7 +302,7 @@ export function BodyEditor({
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <Label htmlFor={showFields ? undefined : 'mocksmith-body'}>Response body</Label>
+          <Label htmlFor={showFields ? undefined : 'decoy-body'}>Response body</Label>
           {/* Only for json. There are no fields in a plain-text body, and a
               disabled toggle sitting there would imply otherwise. */}
           {type === 'json' ? (
@@ -349,15 +350,15 @@ export function BodyEditor({
         {showFields ? (
           <FieldsEditor value={value} onChange={onChangeValue} />
         ) : (
-          <Textarea
-            id="mocksmith-body"
+          <CodeEditor
+            id="decoy-body"
             ref={inlineRef}
             rows={8}
+            language={type === 'json' ? 'json' : 'none'}
             value={value}
+            onValueChange={onChangeValue}
             aria-invalid={jsonError !== null}
-            onChange={(event) => {
-              onChangeValue(event.target.value);
-            }}
+            aria-label="Response body"
             placeholder={placeholder}
           />
         )}
@@ -405,15 +406,14 @@ export function BodyEditor({
           >
             {/* The editor owns the whole dialog body; the outer form still
                 holds the value, so closing loses nothing. */}
-            <Textarea
+            <CodeEditor
               ref={fullRef}
               value={value}
+              onValueChange={onChangeValue}
+              language={type === 'json' ? 'json' : 'none'}
               aria-label="Response body"
-              onChange={(event) => {
-                onChangeValue(event.target.value);
-              }}
               placeholder={placeholder}
-              className="min-h-0 flex-1 resize-none rounded-none bg-paper text-[14px] leading-relaxed shadow-none focus:shadow-none"
+              className="min-h-0 flex-1 rounded-none bg-paper shadow-none focus-within:shadow-none"
             />
           </FullscreenDialogContent>
         ) : null}

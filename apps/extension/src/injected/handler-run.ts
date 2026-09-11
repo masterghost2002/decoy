@@ -6,7 +6,7 @@ import {
   resolveAction,
   urlCaptures,
   type MockRule,
-  type MocksmithConfig,
+  type DecoyConfig,
   type RequestFacts,
   type RuleDecision,
   type SettledPlan,
@@ -23,7 +23,7 @@ export interface SettledDecision {
 }
 
 export interface SettleOptions {
-  config: MocksmithConfig;
+  config: DecoyConfig;
   facts: RequestFacts;
   decision: RuleDecision;
   client: HandlerClient;

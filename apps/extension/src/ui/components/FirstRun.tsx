@@ -16,7 +16,7 @@ export function FirstRun({ onOpenTraffic, onCreateRule }: FirstRunProps) {
     <div className="flex h-full flex-col gap-4 px-5 pt-6 pb-8">
       <div className="flex flex-col gap-1">
         <h2 className="text-[16.5px] font-semibold tracking-[-0.015em] text-ink">
-          Mocksmith is on and watching.
+          Decoy is on and watching.
         </h2>
         <p className="text-[13.5px] text-ink-muted">Three steps and you will see it work.</p>
       </div>

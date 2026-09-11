@@ -1,4 +1,4 @@
-import type { MocksmithConfig } from './config.js';
+import type { DecoyConfig } from './config.js';
 import { matchesRequest, type InterceptedRequest } from './matching.js';
 import { resolveAction, type MockPlan } from './resolve.js';
 import type { MockRule } from './rule.js';
@@ -22,7 +22,7 @@ export interface RuleMatch {
  * it, using the priority model that already exists.
  */
 export function findMatchingRuleFrom(
-  config: MocksmithConfig,
+  config: DecoyConfig,
   request: InterceptedRequest,
   from = 0,
 ): RuleMatch | null {
@@ -38,7 +38,7 @@ export function findMatchingRuleFrom(
 }
 
 export function findMatchingRule(
-  config: MocksmithConfig,
+  config: DecoyConfig,
   request: InterceptedRequest,
 ): MockRule | null {
   return findMatchingRuleFrom(config, request, 0)?.rule ?? null;
@@ -53,7 +53,7 @@ export interface RuleDecision {
 
 /** `null` means "no rule applies, let the real network handle it". */
 export function decideRequest(
-  config: MocksmithConfig,
+  config: DecoyConfig,
   request: InterceptedRequest,
   from = 0,
 ): RuleDecision | null {

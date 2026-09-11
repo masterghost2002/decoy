@@ -118,7 +118,7 @@ export function createHandlerClient(): HandlerClient {
       // The page's console, not the frame's: that is where the person
       // debugging their own page is already looking.
       const write = console[message.level] as ((...args: unknown[]) => void) | undefined;
-      (write ?? console.log)(`[mocksmith ${name}]`, message.text);
+      (write ?? console.log)(`[decoy ${name}]`, message.text);
     }
   });
 

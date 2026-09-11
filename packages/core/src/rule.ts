@@ -125,6 +125,35 @@ export type RuleAction =
   | PassthroughAction;
 export type RuleActionKind = RuleAction['kind'];
 
+/**
+ * True when two rules carry the same *edits* -- the fields a form changes.
+ *
+ * Not the same as deep equality, and the difference is a bug that was shipped:
+ * saving stamps a fresh `updatedAt` on the stored rule, so a draft compared
+ * whole against it never matches again and the Save button stays lit forever,
+ * on a form with nothing left to save.
+ *
+ * `enabled` is excluded for a second reason. It is owned by the switch in the
+ * list, not by the form, so flipping it while a rule is open would otherwise
+ * mark the form dirty -- and saving would then quietly put the old value back.
+ */
+export function ruleEditsEqual(a: MockRule, b: MockRule): boolean {
+  if (a.name !== b.name) return false;
+  return (
+    JSON.stringify(a.matcher) === JSON.stringify(b.matcher) &&
+    JSON.stringify(a.action) === JSON.stringify(b.action)
+  );
+}
+
+/**
+ * The saved rule, carrying the draft's edits. Everything the form does not own
+ * -- `enabled` above all -- is taken from the rule as it stands now, so a save
+ * cannot revert a switch someone flipped while the form was open.
+ */
+export function applyRuleEdits(current: MockRule, draft: MockRule): MockRule {
+  return { ...current, name: draft.name, matcher: draft.matcher, action: draft.action };
+}
+
 export interface MockRule {
   id: string;
   name: string;

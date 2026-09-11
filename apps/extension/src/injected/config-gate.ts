@@ -1,11 +1,11 @@
-import type { MocksmithConfig } from '@mocksmith/core';
+import type { DecoyConfig } from '@mocksmith/core';
 
 export interface ConfigGate {
   /** True once config has arrived, or once we gave up waiting for it. */
   readonly isReady: boolean;
-  snapshot(): MocksmithConfig | null;
+  snapshot(): DecoyConfig | null;
   waitUntilReady(): Promise<void>;
-  update(config: MocksmithConfig): void;
+  update(config: DecoyConfig): void;
 }
 
 /**
@@ -19,7 +19,7 @@ export interface ConfigGate {
  * asleep or reloaded extension.
  */
 export function createConfigGate(fallbackAfterMs: number): ConfigGate {
-  let config: MocksmithConfig | null = null;
+  let config: DecoyConfig | null = null;
   let ready = false;
   let waiters: Array<() => void> = [];
 

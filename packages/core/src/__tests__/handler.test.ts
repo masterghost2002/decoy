@@ -13,9 +13,10 @@ import {
 import { urlCaptures } from '../matching.js';
 import { findShadowedRules, firstUrlMatch, ruleCovers } from '../shadow.js';
 import { resolveAction } from '../resolve.js';
-import type { MockRule, MocksmithConfig, UrlMatchMode } from '../index.js';
+import { applyRuleEdits, ruleEditsEqual } from '../rule.js';
+import type { MockRule, DecoyConfig, UrlMatchMode } from '../index.js';
 
-function config(rules: MockRule[]): MocksmithConfig {
+function config(rules: MockRule[]): DecoyConfig {
   return { version: 1, enabled: true, rules };
 }
 
@@ -152,7 +153,7 @@ describe('handlerErrorAction', () => {
     expect(plan.body).toContain('nope is not defined');
     // Header names are passed through as written; only the content type is
     // added by the resolver, and that one is lowercase.
-    expect(plan.headers).toContainEqual(['X-Mocksmith-Error', 'handler']);
+    expect(plan.headers).toContainEqual(['X-Decoy-Error', 'handler']);
   });
 });
 
@@ -311,5 +312,52 @@ describe('findMatchingRuleFrom', () => {
   it('reports the index a decision came from', () => {
     const decision = decideRequest(config(rules), { url: '/api/users', method: 'GET' }, 1);
     expect(decision).toMatchObject({ index: 1 });
+  });
+});
+
+describe('ruleEditsEqual', () => {
+  const base = createRule(1000, 'Users 404');
+
+  it('ignores the timestamp that saving stamps', () => {
+    // The shipped bug: saving rewrote updatedAt, the draft did not have it, and
+    // the Save button stayed enabled on a form with nothing left to save.
+    expect(ruleEditsEqual(base, { ...base, updatedAt: 2000 })).toBe(true);
+  });
+
+  it('ignores the switch the list owns, not the form', () => {
+    expect(ruleEditsEqual(base, { ...base, enabled: !base.enabled })).toBe(true);
+  });
+
+  it('sees a changed name, matcher or action', () => {
+    expect(ruleEditsEqual(base, { ...base, name: 'Renamed' })).toBe(false);
+    expect(
+      ruleEditsEqual(base, {
+        ...base,
+        matcher: { ...base.matcher, url: { ...base.matcher.url, value: '/api/other' } },
+      }),
+    ).toBe(false);
+    expect(ruleEditsEqual(base, { ...base, action: createHandlerAction('return 1;') })).toBe(false);
+  });
+});
+
+describe('applyRuleEdits', () => {
+  it('keeps the switch as it stands now, not as the draft remembers it', () => {
+    // Someone disables the rule from the list while its form is open. Saving
+    // the form must not put it back.
+    const current = { ...createRule(1000, 'Users 404'), enabled: false, updatedAt: 5000 };
+    const draft = { ...current, enabled: true, name: 'Renamed' };
+
+    const saved = applyRuleEdits(current, draft);
+    expect(saved.enabled).toBe(false);
+    expect(saved.name).toBe('Renamed');
+  });
+
+  it('carries the edits and nothing else', () => {
+    const current = createRule(1000, 'Users 404');
+    const draft = { ...current, id: 'not_this', createdAt: 9, name: 'Renamed' };
+    const saved = applyRuleEdits(current, draft);
+    expect(saved.id).toBe(current.id);
+    expect(saved.createdAt).toBe(current.createdAt);
+    expect(saved.name).toBe('Renamed');
   });
 });

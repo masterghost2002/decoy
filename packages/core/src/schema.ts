@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { CONFIG_VERSION, createDefaultConfig, type MocksmithConfig } from './config.js';
+import { CONFIG_VERSION, createDefaultConfig, type DecoyConfig } from './config.js';
 import { CONDITION_OPERATORS, CONDITION_SOURCES } from './conditions.js';
 import {
   DEFAULT_HANDLER_TIMEOUT_MS,
@@ -124,7 +124,7 @@ export const mockRuleSchema = z.object({
   updatedAt: z.number(),
 });
 
-export const mocksmithConfigSchema = z.object({
+export const decoyConfigSchema = z.object({
   version: z.number().int(),
   enabled: z.boolean().default(true),
   rules: z.array(mockRuleSchema).default([]),
@@ -142,12 +142,12 @@ type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : fals
 export type ParsedMatcher = z.infer<typeof requestMatcherSchema>;
 export type ParsedAction = z.infer<typeof ruleActionSchema>;
 export type ParsedRule = z.infer<typeof mockRuleSchema>;
-export type ParsedConfig = z.infer<typeof mocksmithConfigSchema>;
+export type ParsedConfig = z.infer<typeof decoyConfigSchema>;
 
 type _MatcherAgrees = Expect<MutuallyAssignable<ParsedMatcher, RequestMatcher>>;
 type _ActionAgrees = Expect<MutuallyAssignable<ParsedAction, RuleAction>>;
 type _RuleAgrees = Expect<MutuallyAssignable<ParsedRule, MockRule>>;
-type _ConfigAgrees = Expect<MutuallyAssignable<ParsedConfig, MocksmithConfig>>;
+type _ConfigAgrees = Expect<MutuallyAssignable<ParsedConfig, DecoyConfig>>;
 
 /* -------------------------------------------------------------------------- */
 /* Tolerant loading                                                           */
@@ -161,7 +161,7 @@ const configShellSchema = z.object({
 });
 
 export interface ConfigLoadResult {
-  config: MocksmithConfig;
+  config: DecoyConfig;
   /** Rules that failed validation and were left out. */
   droppedRules: number;
   /** True when the stored value was unusable and defaults were substituted. */

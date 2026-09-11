@@ -300,7 +300,7 @@
    * rules would otherwise have provided, and nothing else -- the panel must
    * inherit no more from this stylesheet than the popup does from the page.
    */
-  .mocksmith-surface {
+  .decoy-surface {
     background-color: var(--paper);
     color: var(--ink);
     font-family: var(--font-sans);
@@ -351,7 +351,7 @@
  * product that repeats, and it exists because a still dot cannot distinguish
  * "working" from "configured".
  */
-@keyframes mocksmith-pulse {
+@keyframes decoy-pulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 55%, transparent);
   }
@@ -364,7 +364,7 @@
 }
 
 /** A saved row flashes once, so the change you just made is the one you see. */
-@keyframes mocksmith-flash {
+@keyframes decoy-flash {
   from {
     background-color: var(--wash);
   }
@@ -375,11 +375,11 @@
 
 @layer utilities {
   .animate-pulse-dot {
-    animation: mocksmith-pulse 2s ease-out infinite;
+    animation: decoy-pulse 2s ease-out infinite;
   }
 
   .animate-flash {
-    animation: mocksmith-flash 900ms ease-out 1;
+    animation: decoy-flash 900ms ease-out 1;
   }
 }
 

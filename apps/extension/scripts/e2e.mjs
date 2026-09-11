@@ -146,7 +146,18 @@ function stream(format, values, { intervalMs = 30, repeat = 1, status = 200 } = 
   };
 }
 
-function handler(code, { timeoutMs = 2000, delayMs = 0 } = {}) {
+/**
+ * Written as an indented template literal for readability here, and dedented
+ * before it is stored: a rule seeded with eight spaces of leading whitespace on
+ * every line is not what anyone would have typed.
+ */
+function handler(source, { timeoutMs = 2000, delayMs = 0 } = {}) {
+  const lines = source.replace(/^\n/, '').replace(/\s+$/, '').split('\n');
+  const indents = lines
+    .filter((line) => line.trim().length > 0)
+    .map((line) => (/^\s*/.exec(line) ?? [''])[0].length);
+  const strip = indents.length === 0 ? 0 : Math.min(...indents);
+  const code = lines.map((line) => line.slice(strip)).join('\n');
   return { kind: 'handler', code, delayMs, timeoutMs };
 }
 
@@ -372,7 +383,7 @@ function startFixtureServer() {
            * way they are. No `unsafe-eval`, so building a function from a
            * string is impossible in this page; `frame-src 'self'`, so the page
            * cannot iframe anything either. A hardened app looks like this, and
-           * Mocksmith has to work inside one -- the sandbox is an extension
+           * Decoy has to work inside one -- the sandbox is an extension
            * frame, which neither directive reaches.
            */
           'content-security-policy':
@@ -510,14 +521,14 @@ async function findServiceWorker(cdp, timeoutMs = 25_000) {
       } catch {
         // Not an extension worker, or not ready yet.
       }
-      if (name === 'Mocksmith') return { worker, sessionId };
+      if (name === 'Decoy') return { worker, sessionId };
       await cdp.send('Target.detachFromTarget', { sessionId });
     }
     await sleep(250);
   }
 
   throw new Error(
-    `The Mocksmith service worker never appeared as a CDP target.\nService workers seen: ${
+    `The Decoy service worker never appeared as a CDP target.\nService workers seen: ${
       seen.length > 0 ? seen.join(', ') : 'none'
     }`,
   );
@@ -810,7 +821,7 @@ async function main() {
   console.log(`browser: ${chromePath}`);
 
   const server = await startFixtureServer();
-  const userDataDir = await mkdtemp(path.join(tmpdir(), 'mocksmith-e2e-'));
+  const userDataDir = await mkdtemp(path.join(tmpdir(), 'decoy-e2e-'));
 
   const chrome = spawn(
     chromePath,
@@ -884,7 +895,7 @@ async function main() {
     );
     await loaded;
 
-    const results = await evaluate(cdp, pageSession, 'window.__mocksmith.runAll()');
+    const results = await evaluate(cdp, pageSession, 'window.__decoy.runAll()');
 
     console.log('');
     for (const result of results) {
@@ -1021,6 +1032,229 @@ async function main() {
        })()`,
     );
 
+    /*
+     * The rule lifecycle, end to end in the real UI: create, rename, save,
+     * duplicate, reorder, disable, delete, undo. Every one of these writes
+     * through the worker and comes back as the thing the list renders, so a
+     * break anywhere in that loop shows up here rather than in a bug report.
+     */
+    const lifecycle = await evaluate(
+      cdp,
+      pageSession,
+      `(async () => {
+         const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+         /* Menu items are div[role=menuitem], not buttons: a helper that only
+            looked at buttons silently found nothing and the menu steps looked
+            broken when they were not. */
+         const byText = (text) =>
+           [...document.querySelectorAll('button, [role="menuitem"]')].find(
+             (node) => node.textContent.trim() === text,
+           );
+         const type = (selector, text) => {
+           const field = document.querySelector(selector);
+           Object.getOwnPropertyDescriptor(
+             window.HTMLInputElement.prototype,
+             'value',
+           ).set.call(field, text);
+           field.dispatchEvent(new Event('input', { bubbles: true }));
+         };
+         const openMenu = async (name) => {
+           const row = [...document.querySelectorAll('li button')].find((button) =>
+             button.textContent.includes(name),
+           );
+           const trigger = row?.closest('li')?.querySelector('[aria-haspopup="menu"]');
+           trigger?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+           await pause(450);
+           return trigger !== null && trigger !== undefined;
+         };
+         const choose = async (label) => {
+           const item = byText(label);
+           /* Radix commits a menu item on pointerup, and closes on the click
+              that follows; a bare .click() lands on neither. */
+           item?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+           item?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0 }));
+           item?.click();
+           await pause(700);
+           return item !== undefined;
+         };
+         const rules = async () => {
+           const reply = await chrome.runtime.sendMessage({ type: 'config:get' });
+           return reply?.config?.rules ?? [];
+         };
+         const names = async () => (await rules()).map((rule) => rule.name);
+         const rowFor = (name) =>
+           [...document.querySelectorAll('li button')].find((button) =>
+             button.textContent.includes(name),
+           );
+
+         const before = (await rules()).length;
+
+         /* Create. The new rule is selected and open, so it can be named at once. */
+         byText('New rule')?.click();
+         await pause(700);
+         const created = (await rules()).length === before + 1;
+
+         type('[aria-label="Rule name"]', 'Lifecycle rule');
+         type('#decoy-url-value', '/api/lifecycle');
+         await pause(250);
+         byText('Save')?.click();
+         await pause(700);
+         const saved = (await names()).includes('Lifecycle rule');
+
+         /* Duplicate, which lands directly below and starts disabled so it
+            cannot surprise anyone. */
+         const menuOpened = await openMenu('Lifecycle rule');
+         const choseDuplicate = await choose('Duplicate');
+         const afterDuplicate = await rules();
+         const copyIndex = afterDuplicate.findIndex((rule) => rule.name.endsWith('(copy)'));
+         const originalIndex = afterDuplicate.findIndex((rule) => rule.name === 'Lifecycle rule');
+         const duplicated =
+           copyIndex === originalIndex + 1 && afterDuplicate[copyIndex]?.enabled === false;
+
+         /* Reorder: position is the entire priority model, so moving a rule to
+            the top has to actually move it. */
+         const copyName = afterDuplicate[copyIndex]?.name ?? '';
+         await openMenu(copyName);
+         await choose('Move to top');
+         const movedToTop = (await rules())[0]?.name === copyName;
+
+         /* The copy goes first, by the one part of its name the original does
+            not share -- otherwise every later lookup finds the copy. */
+         rowFor('(copy)')?.click();
+         await pause(400);
+         document.querySelector('[aria-label="Delete this rule"]')?.click();
+         await pause(700);
+         const copyGone = !(await names()).some((name) => name.endsWith('(copy)'));
+
+         /* Disable from the list. The switch is labelled for what clicking it
+            will do, which is why this looks for "Disable". */
+         const toggle = [...document.querySelectorAll('[role="switch"]')].find((node) =>
+           (node.getAttribute('aria-label') ?? '').startsWith('Disable Lifecycle rule'),
+         );
+         toggle?.click();
+         await pause(700);
+         const disabled =
+           (await rules()).find((rule) => rule.name === 'Lifecycle rule')?.enabled === false;
+
+         /* Delete, then take it back. The undo is the reason there is no
+            confirm dialog on the common path. */
+         rowFor('Lifecycle rule')?.click();
+         await pause(400);
+         document.querySelector('[aria-label="Delete this rule"]')?.click();
+         await pause(600);
+         const deleted = !(await names()).includes('Lifecycle rule');
+
+         byText('Undo')?.click();
+         await pause(700);
+         const restored = (await names()).includes('Lifecycle rule');
+
+         /* The master switch, which is what someone reaches for when they want
+            their own app back for a minute. */
+         const master = document.querySelector('[aria-label="Pause all mocking"]');
+         master?.click();
+         await pause(700);
+         const pausedReply = await chrome.runtime.sendMessage({ type: 'config:get' });
+         /* Case-insensitive: the status is an eyebrow, and innerText reports
+            what is rendered -- which CSS has already put in capitals. */
+         const saysPaused = /paused/i.test(document.body.innerText);
+         const paused = pausedReply?.config?.enabled === false && saysPaused;
+
+         /* Put everything back, so the shots and the next run start clean. */
+         await chrome.storage.local.set({ ${JSON.stringify(STORAGE_KEY)}: ${JSON.stringify(SEED_CONFIG)} });
+         await pause(500);
+
+         return {
+           created,
+           saved,
+           duplicated,
+           copyGone,
+           movedToTop,
+           disabled,
+           deleted,
+           restored,
+           paused,
+         };
+       })()`,
+    );
+
+    /*
+     * Button state through a whole edit. The reported bug was that Save stayed
+     * enabled after saving -- the form offering to save something it had just
+     * saved -- and the same flaw meant a switch flipped in the list while the
+     * form was open would be reverted by the next save. Both are asserted here
+     * because both are invisible until someone loses work to them.
+     */
+    const buttonState = await evaluate(
+      cdp,
+      pageSession,
+      `(async () => {
+         const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+         const byText = (text) =>
+           [...document.querySelectorAll('button')].find(
+             (button) => button.textContent.trim() === text,
+           );
+         const state = () => ({
+           save: byText('Save')?.disabled ?? null,
+           discard: byText('Discard')?.disabled ?? null,
+         });
+         const type = (selector, text) => {
+           const field = document.querySelector(selector);
+           const proto =
+             field instanceof HTMLTextAreaElement
+               ? window.HTMLTextAreaElement.prototype
+               : window.HTMLInputElement.prototype;
+           Object.getOwnPropertyDescriptor(proto, 'value').set.call(field, text);
+           field.dispatchEvent(new Event('input', { bubbles: true }));
+         };
+
+         const row = [...document.querySelectorAll('li button')].find((button) =>
+           button.textContent.includes('Slow endpoint'),
+         );
+         row?.click();
+         await pause(400);
+         const atRest = state();
+
+         type('[aria-label="Rule name"]', 'Slow endpoint edited');
+         await pause(250);
+         const dirty = state();
+
+         byText('Save')?.click();
+         await pause(700);
+         const afterSave = state();
+
+         type('[aria-label="Rule name"]', 'Slow endpoint edited twice');
+         await pause(250);
+         byText('Discard')?.click();
+         await pause(300);
+         const afterDiscard = {
+           ...state(),
+           name: document.querySelector('[aria-label="Rule name"]')?.value ?? '',
+         };
+
+         /* An invalid pattern must not be savable, however dirty the form is. */
+         type('#decoy-url-value', '');
+         await pause(250);
+         const invalid = {
+           ...state(),
+           alert: document.querySelector('[role="alert"]')?.textContent ?? '',
+         };
+         byText('Discard')?.click();
+         await pause(300);
+
+         /* The switch belongs to the list, not to the form. Flipping it must
+            not make the form dirty -- and must survive the next save. */
+         const toggle = [...document.querySelectorAll('button[role="switch"]')].find((button) =>
+           (button.getAttribute('aria-label') ?? '').includes('Slow endpoint'),
+         );
+         const toggled = toggle !== undefined;
+         toggle?.click();
+         await pause(600);
+         const afterToggle = state();
+
+         return { atRest, dirty, afterSave, afterDiscard, invalid, toggled, afterToggle };
+       })()`,
+    );
+
     /* The handler editor's own runner. It matters that this works from an
        extension page as well as from a content script: the editor cannot
        compile the code itself -- MV3 forbids it there too -- so it asks the
@@ -1052,7 +1286,7 @@ async function main() {
          pick('Echo the request');
          await pause(500);
 
-         const code = document.querySelector('#mocksmith-handler-code');
+         const code = document.querySelector('#decoy-handler-code');
          const url = document.querySelector('[aria-label="Test request url"]');
          const method = document.querySelector('[aria-label="Test request method"]');
          const payload = document.querySelector('[aria-label="Test request payload"]');
@@ -1069,6 +1303,24 @@ async function main() {
          run?.click();
          await pause(900);
 
+         /*
+          * The colours are a layer behind a transparent textarea, so they are
+          * only ever as correct as their alignment. If the tokenizer drops or
+          * duplicates a single character the whole file slides out from under
+          * the caret -- invisible in code review, obvious and maddening in use.
+          */
+         const codeField = document.querySelector('#decoy-handler-code');
+         const layer = codeField?.parentElement?.querySelector('pre[aria-hidden]');
+         const aligned =
+           layer !== null &&
+           layer !== undefined &&
+           layer.textContent.replace(/\u200b/g, '') === codeField.value;
+         const coloured = new Set(
+           [...(layer?.querySelectorAll('span') ?? [])]
+             .map((span) => span.className)
+             .filter((name) => name.length > 0),
+         ).size;
+
          const shown = [...document.querySelectorAll('pre')].map((node) => node.textContent);
          const pressed = [
            ...(document.querySelector('[aria-label="Rule action"]')?.querySelectorAll('button') ??
@@ -1080,6 +1332,8 @@ async function main() {
          return {
            editor: true,
            pressed,
+           aligned,
+           coloured,
            /* The editor shows the code, not a placeholder for it. */
            showsCode: code.value.includes('res.status(201)'),
            wire: shown.find((text) => (text ?? '').includes('HTTP/1.1')) ?? '',
@@ -1110,9 +1364,9 @@ async function main() {
     );
 
     const inspectPanel = `(() => {
-      const host = document.querySelector('mocksmith-panel');
+      const host = document.querySelector('decoy-panel');
       if (host === null) return { mounted: false };
-      const surface = host.shadowRoot?.querySelector('.mocksmith-surface') ?? null;
+      const surface = host.shadowRoot?.querySelector('.decoy-surface') ?? null;
       if (surface === null) return { mounted: true, styled: false };
       const style = getComputedStyle(surface);
       return {
@@ -1148,7 +1402,7 @@ async function main() {
       hostSession,
       `(async () => {
          const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-         const host = document.querySelector('mocksmith-panel');
+         const host = document.querySelector('decoy-panel');
          const shadow = host?.shadowRoot ?? null;
          if (shadow === null) return { reached: false };
 
@@ -1194,7 +1448,7 @@ async function main() {
          mock?.click();
          await pause(800);
 
-         const surface = shadow.querySelector('.mocksmith-surface');
+         const surface = shadow.querySelector('.decoy-surface');
          return {
            reached: true,
            rows: true,
@@ -1233,12 +1487,84 @@ async function main() {
        })()`,
     );
 
+    /* Collapsing folds the panel away without losing it. */
+    const panelCollapse = await evaluate(
+      cdp,
+      hostSession,
+      `(async () => {
+         const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+         const shadow = document.querySelector('decoy-panel')?.shadowRoot ?? null;
+         if (shadow === null) return { reached: false };
+
+         const surface = shadow.querySelector('.decoy-surface');
+         const before = surface.getBoundingClientRect();
+
+         const collapse = shadow.querySelector('[aria-label="Collapse the Decoy panel"]');
+         if (collapse === null) return { reached: true, hasControl: false };
+         collapse.click();
+         await pause(400);
+
+         const launcher = shadow.querySelector('[aria-label="Expand the Decoy panel"]');
+         const collapsedState = {
+           frameHidden: getComputedStyle(surface).display === 'none',
+           launcherShown: launcher !== null,
+           /* The launcher has to be reachable, not just present: a zero-sized
+              or off-screen button is the same as no way back. */
+           launcherOnScreen:
+             launcher !== null &&
+             launcher.getBoundingClientRect().width > 20 &&
+             launcher.getBoundingClientRect().right <= window.innerWidth + 1,
+         };
+
+         launcher?.click();
+         await pause(400);
+         const after = surface.getBoundingClientRect();
+
+         return {
+           reached: true,
+           hasControl: true,
+           ...collapsedState,
+           restored:
+             getComputedStyle(surface).display !== 'none' &&
+             Math.round(before.width) === Math.round(after.width) &&
+             Math.round(before.x) === Math.round(after.x),
+           /* Collapsing must not have thrown the UI away and rebuilt it. */
+           keptContent: surface.innerText.includes('Decoy'),
+         };
+       })()`,
+    );
+
     if (SCREENSHOT_DIR !== null && panel.mounted === true) {
       await mkdir(SCREENSHOT_DIR, { recursive: true });
       const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' }, hostSession);
       const file = path.join(SCREENSHOT_DIR, 'panel-over-page.png');
       await writeFile(file, Buffer.from(data, 'base64'));
       console.log(`screenshot: ${file}`);
+
+      // And folded away, which is a state with its own failure mode: a
+      // launcher nobody can find is the same as a panel nobody can reopen.
+      const clickInPanel = (label) =>
+        evaluate(
+          cdp,
+          hostSession,
+          `(() => {
+             document
+               .querySelector('decoy-panel')
+               ?.shadowRoot?.querySelector('[aria-label=' + JSON.stringify(${JSON.stringify(label)}) + ']')
+               ?.click();
+             return true;
+           })()`,
+        );
+
+      await clickInPanel('Collapse the Decoy panel');
+      await sleep(500);
+      const collapsed = await cdp.send('Page.captureScreenshot', { format: 'png' }, hostSession);
+      const collapsedFile = path.join(SCREENSHOT_DIR, 'panel-collapsed.png');
+      await writeFile(collapsedFile, Buffer.from(collapsed.data, 'base64'));
+      console.log(`screenshot: ${collapsedFile}`);
+
+      await clickInPanel('Expand the Decoy panel');
+      await sleep(400);
     }
 
     // Injecting a second time is how the panel is dismissed.
@@ -1300,6 +1626,50 @@ async function main() {
           handlerEditor.wire.includes('from the editor') &&
           handlerEditor.wire.includes('"page": "7"'),
       ],
+      [
+        'ui: a rule with no edits cannot be saved or discarded',
+        buttonState.atRest.save === true && buttonState.atRest.discard === true,
+      ],
+      [
+        'ui: editing enables both',
+        buttonState.dirty.save === false && buttonState.dirty.discard === false,
+      ],
+      [
+        'ui: saving disables them again',
+        buttonState.afterSave.save === true && buttonState.afterSave.discard === true,
+      ],
+      [
+        'ui: discarding reverts the field and disables them again',
+        buttonState.afterDiscard.save === true &&
+          buttonState.afterDiscard.discard === true &&
+          buttonState.afterDiscard.name === 'Slow endpoint edited',
+      ],
+      [
+        'ui: an invalid url pattern cannot be saved, and says why',
+        buttonState.invalid.save === true &&
+          buttonState.invalid.discard === false &&
+          buttonState.invalid.alert.includes('required'),
+      ],
+      [
+        'ui: the list switch does not make the open form dirty',
+        buttonState.toggled === true && buttonState.afterToggle.save === true,
+      ],
+      [
+        'ui: the highlight layer matches the code character for character',
+        handlerEditor.aligned === true,
+      ],
+      [
+        `ui: the handler is actually coloured (${String(handlerEditor.coloured)} kinds)`,
+        typeof handlerEditor.coloured === 'number' && handlerEditor.coloured >= 4,
+      ],
+      ['ui: New rule creates one and opens it', lifecycle.created === true],
+      ['ui: a named, patterned rule saves', lifecycle.saved === true],
+      ['ui: duplicating lands below the original and starts disabled', lifecycle.duplicated === true],
+      ['ui: move to top actually reorders, which is the priority model', lifecycle.movedToTop === true],
+      ['ui: deleting the duplicate leaves the original alone', lifecycle.copyGone === true],
+      ['ui: the list switch disables a rule', lifecycle.disabled === true],
+      ['ui: deleting removes it, and undo brings it back', lifecycle.deleted === true && lifecycle.restored === true],
+      ['ui: the master switch pauses everything and says so', lifecycle.paused === true],
       ['panel: mounts a shadow root into the page', panel.mounted === true],
       [
         // Either paper is a pass; which one depends on the host's colour
@@ -1311,7 +1681,7 @@ async function main() {
       [`panel: keeps its rounded corners (${String(panel.radius)})`, panel.radius === '14px'],
       [
         'panel: renders the rule editor, not an unstyled stack',
-        typeof panel.text === 'string' && panel.text.includes('Mocksmith'),
+        typeof panel.text === 'string' && panel.text.includes('Decoy'),
       ],
       [
         `panel: sizes itself to its own box, not the window (${String(panel.width)}px)`,
@@ -1336,6 +1706,12 @@ async function main() {
       [
         `panel: Mock this opens the new rule in the panel (${String(panelWrote.lastName)})`,
         panelTraffic.showsNewRule === true,
+      ],
+      ['panel: collapses to a launcher at the edge of the page', panelCollapse.frameHidden === true && panelCollapse.launcherShown === true],
+      ['panel: the launcher is actually reachable', panelCollapse.launcherOnScreen === true],
+      [
+        'panel: expanding restores the same panel, not a new one',
+        panelCollapse.restored === true && panelCollapse.keptContent === true,
       ],
       ['panel: a second toggle takes it away again', afterToggle.mounted === false],
     ];

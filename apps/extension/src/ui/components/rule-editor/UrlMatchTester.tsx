@@ -92,7 +92,7 @@ export function UrlMatchTester({ rule, rules }: UrlMatchTesterProps) {
     <div className="flex flex-col gap-1.5 rounded-xl bg-surface p-2.5 shadow-ring">
       <div className="flex items-center justify-between gap-2">
         {/* Named for what it answers, not for what you type into it. */}
-        <Label htmlFor="mocksmith-url-tester">Which rule wins?</Label>
+        <Label htmlFor="decoy-url-tester">Which rule wins?</Label>
         {verdict === null ? null : (
           <Pill
             className={
@@ -104,7 +104,7 @@ export function UrlMatchTester({ rule, rules }: UrlMatchTesterProps) {
         )}
       </div>
       <Input
-        id="mocksmith-url-tester"
+        id="decoy-url-tester"
         value={candidate}
         onChange={(event) => {
           setCandidate(event.target.value);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { MocksmithConfig } from '../config.js';
+import type { DecoyConfig } from '../config.js';
 import { CONFIG_VERSION } from '../config.js';
 import { decideRequest, findMatchingRule } from '../engine.js';
 import { METHOD_ANY } from '../http.js';
@@ -32,7 +32,7 @@ function rule(id: string, urlValue: string, overrides: Partial<MockRule> = {}): 
   };
 }
 
-function config(rules: MockRule[], enabled = true): MocksmithConfig {
+function config(rules: MockRule[], enabled = true): DecoyConfig {
   return { version: CONFIG_VERSION, enabled, rules };
 }
 

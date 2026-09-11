@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Mocksmith Chrome extension (MV3).",
+  "description": "Decoy Chrome extension (MV3).",
   "scripts": {
     "build": "pnpm clean && pnpm contrast && pnpm icons && node scripts/build.mjs",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",

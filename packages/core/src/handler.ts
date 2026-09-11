@@ -10,7 +10,7 @@ import type {
 } from './rule.js';
 
 /**
- * The contract between a user-written handler and the rest of Mocksmith.
+ * The contract between a user-written handler and the rest of Decoy.
  *
  * A handler is a JavaScript function the user writes, which answers a request
  * the way an Express route would. Everything in this file is pure data: the
@@ -189,7 +189,7 @@ export function buildHandlerRequest(
  * Tags every message to and from the sandbox frame. The page shares `window`
  * with the site, so anything arriving without this is somebody else's traffic.
  */
-export const HANDLER_CHANNEL = 'mocksmith.handler.v1';
+export const HANDLER_CHANNEL = 'decoy.handler.v1';
 
 export interface HandlerCallMessage {
   channel: typeof HANDLER_CHANNEL;
@@ -328,11 +328,11 @@ export function handlerErrorAction(message: string): RespondAction {
   return {
     kind: 'respond',
     status: 500,
-    statusText: 'Mocksmith Handler Error',
-    headers: [{ name: 'X-Mocksmith-Error', value: 'handler' }],
+    statusText: 'Decoy Handler Error',
+    headers: [{ name: 'X-Decoy-Error', value: 'handler' }],
     body: {
       type: 'json',
-      value: JSON.stringify({ error: 'Mocksmith handler failed', detail: message }, null, 2),
+      value: JSON.stringify({ error: 'Decoy handler failed', detail: message }, null, 2),
     },
     delayMs: 0,
   };

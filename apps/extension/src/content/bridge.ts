@@ -13,7 +13,7 @@ import {
   type ExtensionEvent,
   type ExtensionMessage,
   type ExtensionResponse,
-  type MocksmithConfig,
+  type DecoyConfig,
   type TrafficEntry,
 } from '@mocksmith/core';
 
@@ -21,7 +21,7 @@ import {
 const FLUSH_INTERVAL_MS = 250;
 const MAX_PENDING_ENTRIES = 100;
 
-let currentConfig: MocksmithConfig | null = null;
+let currentConfig: DecoyConfig | null = null;
 /**
  * Flips to false when the extension is reloaded or updated. The already-injected
  * page script keeps working with the last config it received, but there is
@@ -71,7 +71,7 @@ function sandboxUrl(): string | undefined {
   }
 }
 
-function postConfigToPage(config: MocksmithConfig): void {
+function postConfigToPage(config: DecoyConfig): void {
   const message: BridgeToPageMessage = {
     channel: PAGE_BRIDGE_CHANNEL,
     direction: 'to-page',

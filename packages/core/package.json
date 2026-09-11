@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Platform-agnostic matching and response-planning engine for mocksmith.",
+  "description": "Platform-agnostic matching and response-planning engine for decoy.",
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts"

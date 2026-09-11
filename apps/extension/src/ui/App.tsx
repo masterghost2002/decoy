@@ -2,7 +2,7 @@ import {
   createRule,
   findShadowedRules,
   type MockRule,
-  type MocksmithConfig,
+  type DecoyConfig,
   type TrafficEntry,
 } from '@mocksmith/core';
 import {
@@ -64,6 +64,7 @@ export type ViewKind = 'popup' | 'tab' | 'panel';
  */
 export interface PanelChrome {
   onClose: () => void;
+  onCollapse: () => void;
   onDragPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
 }
 
@@ -86,7 +87,7 @@ export function App({ view, panelChrome }: { view: ViewKind; panelChrome?: Panel
     return (
       <EmptyState
         icon={TriangleAlert}
-        title="Mocksmith could not start"
+        title="Decoy could not start"
         description={
           error ??
           'The background worker did not respond. Reloading the extension usually clears this.'
@@ -114,9 +115,9 @@ export function App({ view, panelChrome }: { view: ViewKind; panelChrome?: Panel
 
 interface SurfaceProps {
   view: ViewKind;
-  config: MocksmithConfig;
+  config: DecoyConfig;
   error: string | null;
-  update: (next: MocksmithConfig) => void;
+  update: (next: DecoyConfig) => void;
   panelChrome?: PanelChrome;
 }
 
@@ -282,7 +283,7 @@ function Surface({ view, config, error, update, panelChrome }: SurfaceProps) {
   const previewVisible = usePreviewPane && !previewCollapsed;
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: usePreviewPane ? 'mocksmith-panes-3' : 'mocksmith-panes-2',
+    id: usePreviewPane ? 'decoy-panes-3' : 'decoy-panes-2',
   });
 
   const togglePane = (ref: typeof listPaneRef) => {
@@ -363,7 +364,7 @@ function Surface({ view, config, error, update, panelChrome }: SurfaceProps) {
       />
     ) : useSplitLayout ? (
       <ResizablePanelGroup
-        id="mocksmith-rules"
+        id="decoy-rules"
         defaultLayout={defaultLayout}
         onLayoutChanged={onLayoutChanged}
       >
@@ -453,7 +454,11 @@ function Surface({ view, config, error, update, panelChrome }: SurfaceProps) {
           : {})}
         {...(panelChrome === undefined
           ? {}
-          : { onClose: panelChrome.onClose, onDragPointerDown: panelChrome.onDragPointerDown })}
+          : {
+              onClose: panelChrome.onClose,
+              onCollapse: panelChrome.onCollapse,
+              onDragPointerDown: panelChrome.onDragPointerDown,
+            })}
       />
 
       {/* Always present, always one height. Pausing swaps the words and the

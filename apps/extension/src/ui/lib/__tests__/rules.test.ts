@@ -1,4 +1,4 @@
-import { createRule, type MockRule, type MocksmithConfig, type TrafficEntry } from '@mocksmith/core';
+import { createRule, type MockRule, type DecoyConfig, type TrafficEntry } from '@mocksmith/core';
 import { parseRule } from '@mocksmith/core/schema';
 import { describe, expect, it } from 'vitest';
 
@@ -19,11 +19,11 @@ function rule(id: string, name = id): MockRule {
   return { ...createRule(0, name), id };
 }
 
-function config(rules: MockRule[]): MocksmithConfig {
+function config(rules: MockRule[]): DecoyConfig {
   return { version: 1, enabled: true, rules };
 }
 
-const ids = (next: MocksmithConfig) => next.rules.map((item) => item.id);
+const ids = (next: DecoyConfig) => next.rules.map((item) => item.id);
 
 describe('upsertRule', () => {
   it('appends a rule that is not in the list', () => {

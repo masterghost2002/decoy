@@ -18,12 +18,18 @@ import {
   type ExtensionEvent,
   type ExtensionMessage,
   type ExtensionResponse,
-  type MocksmithConfig,
+  type DecoyConfig,
   type RuleStats,
   type TrafficEntry,
 } from '@mocksmith/core';
 import { loadConfig } from '@mocksmith/core/schema';
 
+/*
+ * These four keys keep the old product name on purpose. They hold every rule
+ * anyone has written, their hit counts and what the traffic log has already
+ * seen; renaming them would read as tidiness and land as silent data loss.
+ * The name a person sees is not the name a key has to have.
+ */
 const STORAGE_KEY = 'mocksmith.config.v1';
 /** Session storage: hit counts belong to a debugging session, not to the profile. */
 const STATS_KEY = 'mocksmith.stats.v1';
@@ -37,7 +43,7 @@ const TRAFFIC_SEEN_KEY = 'mocksmith.traffic.seen.v1';
 const BADGE_ACTIVE_COLOUR = '#f59e0b';
 const BADGE_PAUSED_COLOUR = '#64748b';
 
-let cachedConfig: MocksmithConfig | null = null;
+let cachedConfig: DecoyConfig | null = null;
 let trafficLog: TrafficEntry[] = [];
 
 /**
@@ -74,7 +80,7 @@ const panelTabs = new Set<number>();
 /* Config                                                                     */
 /* -------------------------------------------------------------------------- */
 
-async function persist(config: MocksmithConfig): Promise<void> {
+async function persist(config: DecoyConfig): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEY]: config });
 }
 
@@ -83,7 +89,7 @@ async function readStoredConfig(): Promise<unknown> {
   return stored[STORAGE_KEY];
 }
 
-async function getConfig(): Promise<MocksmithConfig> {
+async function getConfig(): Promise<DecoyConfig> {
   if (cachedConfig !== null) return cachedConfig;
 
   const raw = await readStoredConfig();
@@ -101,7 +107,7 @@ async function getConfig(): Promise<MocksmithConfig> {
   cachedConfig = result.config;
   if (result.reset || result.droppedRules > 0) {
     console.warn(
-      `[mocksmith] repaired stored config (reset=${String(result.reset)}, droppedRules=${String(result.droppedRules)})`,
+      `[decoy] repaired stored config (reset=${String(result.reset)}, droppedRules=${String(result.droppedRules)})`,
     );
     await persist(result.config);
   }
@@ -110,7 +116,7 @@ async function getConfig(): Promise<MocksmithConfig> {
 
 /** Everything written goes through validation, including our own UI's writes. */
 async function replaceConfig(next: unknown): Promise<{
-  config: MocksmithConfig;
+  config: DecoyConfig;
   droppedRules: number;
 }> {
   const result = loadConfig(next);
@@ -136,7 +142,7 @@ async function replaceConfig(next: unknown): Promise<{
 
   if (result.droppedRules > 0) {
     console.warn(
-      `[mocksmith] refused ${String(result.droppedRules)} rule(s) on write: they did not validate`,
+      `[decoy] refused ${String(result.droppedRules)} rule(s) on write: they did not validate`,
     );
   }
 
@@ -198,7 +204,7 @@ function publishStats(): void {
  * per-tab badge reports evidence: how many requests were actually mocked on
  * that tab. A per-tab value overrides the global one wherever it is set.
  */
-async function updateBadge(config: MocksmithConfig): Promise<void> {
+async function updateBadge(config: DecoyConfig): Promise<void> {
   const activeRules = config.rules.filter((rule) => rule.enabled).length;
   const text = !config.enabled ? 'off' : activeRules > 0 ? String(activeRules) : '';
 

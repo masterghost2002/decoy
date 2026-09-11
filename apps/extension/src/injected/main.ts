@@ -18,7 +18,7 @@ import { createHandlerClient } from './handler-client.js';
 import { createReporter } from './reporter.js';
 import { installXhrPatch } from './xhr-patch.js';
 
-const INSTALL_FLAG = '__mocksmithInstalled';
+const INSTALL_FLAG = '__decoyInstalled';
 
 /**
  * How long a request made before the rules arrive is willing to wait. Long

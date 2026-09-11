@@ -1,5 +1,5 @@
 /**
- * The sandbox: the only place in Mocksmith where a string becomes a function.
+ * The sandbox: the only place in Decoy where a string becomes a function.
  *
  * This page is listed under `sandbox.pages` in the manifest, which gives it a
  * policy that permits `eval` and denies it every `chrome.*` API. That trade is

@@ -6,7 +6,7 @@ export const THEME_CHOICES = ['system', 'light', 'dark'] as const;
 export type ThemeChoice = (typeof THEME_CHOICES)[number];
 
 /**
- * Deliberately not part of `MocksmithConfig`. The config is the rule set: it is
+ * Deliberately not part of `DecoyConfig`. The config is the rule set: it is
  * validated, broadcast to every tab and re-injected into every page on change.
  * Flipping the theme must not rewrite the rules or wake every content script,
  * so it gets its own key.

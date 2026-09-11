@@ -140,10 +140,10 @@ export function TrafficTable({
             count, and the counts are the information -- a closed dropdown hides
             all four and, as shipped, was not even labelled. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="eyebrow" id="mocksmith-outcome-label">
+          <span className="eyebrow" id="decoy-outcome-label">
             Outcome
           </span>
-          <ChipGroup label="Filter by outcome" aria-labelledby="mocksmith-outcome-label">
+          <ChipGroup label="Filter by outcome" aria-labelledby="decoy-outcome-label">
             {OUTCOME_FILTERS.map((value) => (
               <Chip
                 key={value}

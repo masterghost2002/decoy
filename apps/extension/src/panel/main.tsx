@@ -20,8 +20,8 @@ import { loadFrame, type PanelFrame } from './frame';
 
 import '@/ui/styles.css';
 
-const INSTALL_FLAG = '__mocksmithPanel';
-const HOST_TAG = 'mocksmith-panel';
+const INSTALL_FLAG = '__decoyPanel';
+const HOST_TAG = 'decoy-panel';
 /** Above any overlay a page is likely to have, and the highest value there is. */
 const TOP_LAYER = '2147483647';
 
@@ -84,7 +84,7 @@ function mount(frame: PanelFrame): Installed {
   // The visible box: rounded, clipped to stay rounded, and positioned by
   // `FloatingPanel` from here on.
   const frameEl = document.createElement('div');
-  frameEl.className = 'mocksmith-surface';
+  frameEl.className = 'decoy-surface';
   frameEl.setAttribute(
     'style',
     [

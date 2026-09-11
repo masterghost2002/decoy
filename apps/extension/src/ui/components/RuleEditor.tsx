@@ -2,10 +2,12 @@ import {
   NETWORK_ERROR_TYPES,
   URL_MATCH_MODES,
   createHandlerAction,
+  applyRuleEdits,
   createNetworkErrorAction,
   createRespondAction,
   createStreamAction,
   isValidRegExp,
+  ruleEditsEqual,
   type ConditionMode,
   type MockRule,
   type NetworkErrorType,
@@ -148,7 +150,9 @@ export function RuleEditor({
     setDraft(rule);
   }
 
-  const isDirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(rule), [draft, rule]);
+  // Only the fields this form owns. Comparing the whole rule would count the
+  // `updatedAt` that saving stamps, and the switch the list owns, as edits.
+  const isDirty = useMemo(() => !ruleEditsEqual(draft, rule), [draft, rule]);
 
   const urlError = useMemo(() => {
     const { mode, value } = draft.matcher.url;
@@ -172,7 +176,7 @@ export function RuleEditor({
       if (!(event instanceof KeyboardEvent)) return;
       if (event.key !== 's' || !(event.metaKey || event.ctrlKey)) return;
       event.preventDefault();
-      onSave(draft);
+      onSave(applyRuleEdits(rule, draft));
     };
     // The surface, not `window`: in the floating panel this would otherwise
     // take ⌘S away from the page being debugged.
@@ -181,7 +185,7 @@ export function RuleEditor({
     return () => {
       root.removeEventListener('keydown', onKeyDown);
     };
-  }, [canSave, draft, onSave]);
+  }, [canSave, draft, rule, onSave]);
 
   const patchDraft = (patch: Partial<MockRule>) => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -250,7 +254,7 @@ export function RuleEditor({
       className="flex h-full min-h-0 flex-col bg-paper"
       onSubmit={(event) => {
         event.preventDefault();
-        if (canSave) onSave(draft);
+        if (canSave) onSave(applyRuleEdits(rule, draft));
       }}
     >
       <header className="flex items-center gap-1.5 border-b border-hairline bg-surface px-2.5 py-2">
@@ -313,7 +317,7 @@ export function RuleEditor({
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
-            <Label htmlFor="mocksmith-url-value">Request url</Label>
+            <Label htmlFor="decoy-url-value">Request url</Label>
             {needsSyntaxHelp ? (
               <HelpPopover title="Wildcard and regex syntax" side="bottom">
                 <p>
@@ -358,7 +362,7 @@ export function RuleEditor({
               className="w-[8.5rem] shrink-0"
             />
             <Input
-              id="mocksmith-url-value"
+              id="decoy-url-value"
               value={draft.matcher.url.value}
               aria-invalid={urlError !== null}
               onChange={(event) => {

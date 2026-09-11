@@ -1,7 +1,7 @@
 import type {
   ExtensionMessage,
   ExtensionResponse,
-  MocksmithConfig,
+  DecoyConfig,
   RuleStats,
   TrafficEntry,
 } from '@mocksmith/core';
@@ -14,12 +14,12 @@ async function send(message: ExtensionMessage): Promise<ExtensionResponse> {
     response = (await chrome.runtime.sendMessage(message)) as ExtensionResponse | undefined;
   } catch (error) {
     throw new WorkerError(
-      error instanceof Error ? error.message : 'Could not reach the Mocksmith background worker.',
+      error instanceof Error ? error.message : 'Could not reach the Decoy background worker.',
     );
   }
 
   if (response === undefined) {
-    throw new WorkerError('The Mocksmith background worker did not respond.');
+    throw new WorkerError('The Decoy background worker did not respond.');
   }
   if (response.ok !== true) {
     throw new WorkerError(response.error);
@@ -27,7 +27,7 @@ async function send(message: ExtensionMessage): Promise<ExtensionResponse> {
   return response;
 }
 
-export async function fetchConfig(): Promise<MocksmithConfig> {
+export async function fetchConfig(): Promise<DecoyConfig> {
   const response = await send({ type: 'config:get' });
   if (response.ok !== true || response.kind !== 'config') {
     throw new WorkerError('Unexpected reply to config:get.');
@@ -37,12 +37,12 @@ export async function fetchConfig(): Promise<MocksmithConfig> {
 
 export interface SaveResult {
   /** The config as stored, which may differ if validation repaired it. */
-  config: MocksmithConfig;
+  config: DecoyConfig;
   /** Rules the worker would not store. Always zero unless something is wrong. */
   droppedRules: number;
 }
 
-export async function saveConfig(config: MocksmithConfig): Promise<SaveResult> {
+export async function saveConfig(config: DecoyConfig): Promise<SaveResult> {
   const response = await send({ type: 'config:replace', config });
   if (response.ok !== true || response.kind !== 'config') {
     throw new WorkerError('Unexpected reply to config:replace.');

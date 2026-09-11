@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ExtensionEvent, MocksmithConfig } from '@mocksmith/core';
+import type { ExtensionEvent, DecoyConfig } from '@mocksmith/core';
 
 import { fetchConfig, saveConfig } from '@/ui/lib/messaging';
 
 export type ConfigStatus = 'loading' | 'ready' | 'error';
 
 export interface ConfigState {
-  config: MocksmithConfig | null;
+  config: DecoyConfig | null;
   status: ConfigStatus;
   error: string | null;
   /** Optimistic: applies locally, then persists through the worker. */
-  update: (next: MocksmithConfig) => void;
+  update: (next: DecoyConfig) => void;
   reload: () => void;
 }
 
@@ -20,7 +20,7 @@ function describeError(error: unknown): string {
 }
 
 export function useConfig(): ConfigState {
-  const [config, setConfig] = useState<MocksmithConfig | null>(null);
+  const [config, setConfig] = useState<DecoyConfig | null>(null);
   const [status, setStatus] = useState<ConfigStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   /** While a save is in flight, our own optimistic state is the truth. */
@@ -59,7 +59,7 @@ export function useConfig(): ConfigState {
     };
   }, [reload]);
 
-  const update = useCallback((next: MocksmithConfig) => {
+  const update = useCallback((next: DecoyConfig) => {
     setConfig(next);
     pendingSaves.current += 1;
     saveConfig(next)

@@ -13,6 +13,8 @@ export interface PanelFrame {
   height: number;
 }
 
+// Keeps the old product name: renaming the key would forget where every
+// existing panel was put. See the note in the service worker.
 const STORAGE_KEY = 'mocksmith.panel.frame.v1';
 
 /** Below this the two-pane layout has nowhere to go and the form stops working. */

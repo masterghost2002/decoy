@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // Also to the console, where the component stack is clickable. In the
     // panel this is the page's console, which is where someone debugging their
     // own page is already looking.
-    console.error('[mocksmith] the ui crashed', error, info.componentStack);
+    console.error('[decoy] the ui crashed', error, info.componentStack);
   }
 
   override render(): ReactNode {
@@ -44,7 +44,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         role="alert"
         className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto bg-paper p-4 text-ink"
       >
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Mocksmith hit a bug</h2>
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Decoy hit a bug</h2>
         <p className="max-w-[60ch] text-[13px] leading-relaxed text-ink-muted">
           The interface stopped rendering. Nothing was lost — the rules are stored in the
           extension, not on this screen, and requests are still being intercepted by the rules

@@ -1,9 +1,9 @@
 /**
- * Behavioural checks for the Mocksmith interceptor, run inside a real page.
+ * Behavioural checks for the Decoy interceptor, run inside a real page.
  *
  * Each scenario asserts against the rule set seeded by `scripts/e2e.mjs`. The
  * same file backs the manual page (buttons) and the automated run
- * (`window.__mocksmith.runAll()`), so there is only ever one definition of
+ * (`window.__decoy.runAll()`), so there is only ever one definition of
  * "working".
  */
 
@@ -522,7 +522,7 @@ const SCENARIOS = [
     async run() {
       const response = await fetch('/api/h/throws');
       assertEqual(response.status, 500, 'status');
-      assertEqual(response.headers.get('x-mocksmith-error'), 'handler', 'error marker');
+      assertEqual(response.headers.get('x-decoy-error'), 'handler', 'error marker');
       const body = await response.json();
       assert(
         body.detail.includes('nope'),
@@ -611,7 +611,7 @@ async function runAll() {
   return results;
 }
 
-window.__mocksmith = { runAll, scenarios: SCENARIOS.map((item) => item.name) };
+window.__decoy = { runAll, scenarios: SCENARIOS.map((item) => item.name) };
 
 /* ---------------------------------------------------------------------- */
 /* Manual harness                                                        */

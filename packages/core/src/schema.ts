@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { AGENT_CHANNEL, type AgentCommand, type RuleSpec } from './agent.js';
 import { CONFIG_VERSION, createDefaultConfig, type DecoyConfig } from './config.js';
 import { CONDITION_OPERATORS, CONDITION_SOURCES } from './conditions.js';
 import {
@@ -10,6 +11,7 @@ import {
 import { HTTP_METHODS, METHOD_ANY } from './http.js';
 import { URL_MATCH_MODES, type RequestMatcher } from './matching.js';
 import { NETWORK_ERROR_TYPES, STREAM_FORMATS, type MockRule, type RuleAction } from './rule.js';
+import { TRAFFIC_OUTCOMES } from './traffic.js';
 
 /** Upper bound on a mock delay: 10 minutes is past any real client timeout. */
 const MAX_DELAY_MS = 600_000;
@@ -204,4 +206,143 @@ export function loadConfig(input: unknown): ConfigLoadResult {
 export function parseRule(input: unknown): MockRule | null {
   const parsed = mockRuleSchema.safeParse(input);
   return parsed.success ? parsed.data : null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Agent commands                                                             */
+/*                                                                            */
+/* A command arrives over a socket from another process. It is validated here  */
+/* for the same reason stored config is: the rest of the code should be able   */
+/* to trust its input, and an agent that sends nonsense deserves a sentence    */
+/* rather than a stack trace.                                                  */
+/* -------------------------------------------------------------------------- */
+
+export const conditionSpecSchema = z.object({
+  source: z.enum(CONDITION_SOURCES),
+  key: z.string().optional(),
+  operator: z.enum(CONDITION_OPERATORS),
+  value: z.string().optional(),
+  caseSensitive: z.boolean().optional(),
+});
+
+const headersRecord = z.record(z.string(), z.string()).optional();
+
+export const ruleSpecSchema = z.object({
+  name: z.string().optional(),
+  url: z.string().min(1, 'A rule needs a url pattern; without one it can never match.'),
+  mode: z.enum(URL_MATCH_MODES).optional(),
+  caseSensitive: z.boolean().optional(),
+  methods: z.array(methodPatternSchema).optional(),
+  conditions: z.array(conditionSpecSchema).optional(),
+  conditionMode: z.enum(['all', 'any']).optional(),
+  enabled: z.boolean().optional(),
+
+  respond: z
+    .object({
+      status: z.number().int().min(200).max(599).optional(),
+      statusText: z.string().optional(),
+      headers: headersRecord,
+      // Deliberately unknown: an object is serialized, a string is sent as-is,
+      // and a deliberately malformed body is a legitimate thing to mock.
+      json: z.unknown().optional(),
+      text: z.string().optional(),
+      delayMs: z.number().int().min(0).max(MAX_DELAY_MS).optional(),
+    })
+    .optional(),
+  stream: z
+    .object({
+      chunks: z.array(z.unknown()).min(1),
+      format: z.enum(STREAM_FORMATS).optional(),
+      status: z.number().int().min(200).max(599).optional(),
+      headers: headersRecord,
+      intervalMs: z.number().int().min(0).max(MAX_DELAY_MS).optional(),
+      repeat: z.number().int().min(0).max(MAX_STREAM_REPEAT).optional(),
+      delayMs: z.number().int().min(0).max(MAX_DELAY_MS).optional(),
+    })
+    .optional(),
+  handler: z
+    .object({
+      code: z.string().min(1).max(MAX_HANDLER_CODE_CHARS),
+      timeoutMs: z.number().int().min(1).max(MAX_HANDLER_TIMEOUT_MS).optional(),
+      delayMs: z.number().int().min(0).max(MAX_DELAY_MS).optional(),
+    })
+    .optional(),
+  fail: z
+    .object({
+      type: z.enum(NETWORK_ERROR_TYPES).optional(),
+      delayMs: z.number().int().min(0).max(MAX_DELAY_MS).optional(),
+    })
+    .optional(),
+  passthrough: z.literal(true).optional(),
+});
+
+export const agentCommandSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('status') }),
+  z.object({ kind: z.literal('rules.list') }),
+  z.object({ kind: z.literal('rules.get'), id: z.string().min(1) }),
+  z.object({
+    kind: z.literal('rules.create'),
+    spec: ruleSpecSchema,
+    index: z.number().int().min(0).optional(),
+  }),
+  z.object({
+    kind: z.literal('rules.update'),
+    id: z.string().min(1),
+    spec: ruleSpecSchema.partial(),
+  }),
+  z.object({ kind: z.literal('rules.delete'), id: z.string().min(1) }),
+  z.object({ kind: z.literal('rules.enable'), id: z.string().min(1), enabled: z.boolean() }),
+  z.object({
+    kind: z.literal('rules.move'),
+    id: z.string().min(1),
+    index: z.number().int().min(0),
+  }),
+  z.object({ kind: z.literal('mocking.set'), enabled: z.boolean() }),
+  z.object({
+    kind: z.literal('traffic.list'),
+    limit: z.number().int().min(1).max(500).optional(),
+    outcome: z.enum(TRAFFIC_OUTCOMES).optional(),
+    urlContains: z.string().optional(),
+  }),
+  z.object({ kind: z.literal('traffic.clear') }),
+  z.object({
+    kind: z.literal('match.test'),
+    url: z.string().min(1),
+    method: z.string().optional(),
+  }),
+]);
+
+export const agentRequestSchema = z.object({
+  channel: z.literal(AGENT_CHANNEL),
+  kind: z.literal('command'),
+  id: z.string().min(1),
+  command: agentCommandSchema,
+});
+
+export interface ParsedCommand {
+  ok: boolean;
+  command?: AgentCommand;
+  /** One sentence naming the field, for an agent to act on. */
+  error?: string;
+}
+
+/** Validates a command, reporting the first problem in words rather than codes. */
+export function parseAgentCommand(raw: unknown): ParsedCommand {
+  const result = agentCommandSchema.safeParse(raw);
+  if (result.success) return { ok: true, command: result.data };
+
+  const first = result.error.issues[0];
+  const where = first === undefined || first.path.length === 0 ? '' : `${first.path.join('.')}: `;
+  return { ok: false, error: `${where}${first?.message ?? 'the command did not validate'}` };
+}
+
+/** The same, for a whole rule spec -- used by the bridge before it sends one. */
+export function parseRuleSpec(
+  raw: unknown,
+): { ok: true; spec: RuleSpec } | { ok: false; error: string } {
+  const result = ruleSpecSchema.safeParse(raw);
+  if (result.success) return { ok: true, spec: result.data };
+  const first = result.error.issues[0];
+  const where = first === undefined || first.path.length === 0 ? '' : `${first.path.join('.')}: `;
+  return { ok: false, error: `${where}${first?.message ?? 'the rule did not validate'}` };
 }

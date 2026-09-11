@@ -31,7 +31,15 @@ export type ExtensionMessage =
   | { type: 'panel:attached' }
   | { type: 'panel:detached' }
   /** A content script cannot read `chrome.tabs`; only the worker knows this. */
-  | { type: 'tab:whoami' };
+  | { type: 'tab:whoami' }
+  /*
+   * Agent control. Kept out of `config:*` deliberately: the token must never
+   * travel with a rule set, which is a thing people export and share.
+   */
+  | { type: 'agent:get' }
+  | { type: 'agent:set'; enabled: boolean; port: number }
+  /** A fresh token, which invalidates whatever the old one was pasted into. */
+  | { type: 'agent:rotate' };
 
 export type ExtensionMessageType = ExtensionMessage['type'];
 
@@ -63,6 +71,16 @@ export type ExtensionResponse =
       dropped: boolean;
     }
   | { ok: true; kind: 'stats'; stats: RuleStats }
+  | {
+      ok: true;
+      kind: 'agent';
+      enabled: boolean;
+      port: number;
+      token: string;
+      /** How the bridge connection is actually going, which is the only evidence that matters. */
+      state: 'off' | 'connecting' | 'connected' | 'refused' | 'error';
+      detail: string;
+    }
   | { ok: true; kind: 'tab'; tabId: number | null }
   | { ok: true; kind: 'ack' }
   | { ok: false; error: string };
@@ -73,6 +91,14 @@ export type ExtensionResponse =
  */
 export type ExtensionEvent =
   | { type: 'config:changed'; config: DecoyConfig }
+  | {
+      type: 'agent:changed';
+      enabled: boolean;
+      port: number;
+      token: string;
+      state: 'off' | 'connecting' | 'connected' | 'refused' | 'error';
+      detail: string;
+    }
   | { type: 'traffic:added'; entries: TrafficEntry[] }
   | { type: 'traffic:body'; id: string; body: string | null; truncated: boolean }
   | { type: 'stats:changed'; stats: RuleStats };

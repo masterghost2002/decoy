@@ -1,4 +1,4 @@
-import type { DecoyConfig } from '@mocksmith/core';
+import type { DecoyConfig } from '@decoy/core';
 
 export interface ConfigGate {
   /** True once config has arrived, or once we gave up waiting for it. */

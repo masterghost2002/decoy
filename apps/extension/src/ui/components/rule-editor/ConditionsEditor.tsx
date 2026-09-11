@@ -8,7 +8,7 @@ import {
   type ConditionOperator,
   type ConditionSource,
   type RuleCondition,
-} from '@mocksmith/core';
+} from '@decoy/core';
 import { Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/ui/components/ui/button';

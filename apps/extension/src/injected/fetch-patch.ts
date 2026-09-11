@@ -4,7 +4,7 @@ import {
   type HeaderPair,
   type NetworkErrorType,
   type SettledPlan,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 import { assembleRequest, collectFetchBody, collectFetchHeaders, headersToPairs } from './facts.js';
 import type { ConfigGate } from './config-gate.js';

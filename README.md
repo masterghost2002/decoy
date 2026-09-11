@@ -62,7 +62,7 @@ banner, and it works with DevTools open. That is why it came first.
 ```
                  ┌──────────────────────── page (MAIN world) ────────────────────────┐
                  │  injected.js at document_start                                    │
-  page code ───► │  patched fetch / XMLHttpRequest ──► @mocksmith/core matcher        │
+  page code ───► │  patched fetch / XMLHttpRequest ──► @decoy/core matcher        │
                  │        │                                    │                     │
                  │        │ no rule matched                     │ rule matched        │
                  │        ▼                                    ▼                     │
@@ -86,7 +86,7 @@ rules; the page owns the decision.
 
 - **`packages/core`** — the matcher, the rule contract and the response planner. Pure TypeScript,
   no DOM and no `chrome.*`. Its main entry deliberately contains **no zod**, because that entry is
-  bundled into every page; validation lives behind `@mocksmith/core/schema` and is used only by
+  bundled into every page; validation lives behind `@decoy/core/schema` and is used only by
   the service worker and the UI. The injected bundle is 12 kB minified as a result.
 - **`apps/extension`** — the MV3 surfaces: service worker, content bridge, injected script, and a
   React 19 + Vite + Tailwind 4 + shadcn UI shared by the popup and the full tab.
@@ -280,7 +280,7 @@ the legibility floor.
 Tokens live in `src/ui/styles.css` as CSS variables mapped into Tailwind's theme, so a palette
 change is one file. `eyebrow`, `helper`, `tabular` and `hit-28` are custom utilities.
 
-`pnpm --filter @mocksmith/extension contrast` parses those tokens back out of the stylesheet and
+`pnpm --filter @decoy/extension contrast` parses those tokens back out of the stylesheet and
 checks every pair that carries type against 4.5:1, and every control boundary against 3:1. It runs
 as part of `build`, because the last two regressions it would have caught were both invisible by
 eye: a label at 2.43:1, and an ink that read correctly in one theme and at 1.56:1 in the other
@@ -355,10 +355,10 @@ this one matches.
 
 ```bash
 pnpm typecheck                              # every package
-pnpm test                                   # 211 unit tests
-pnpm --filter @mocksmith/extension contrast # the palette's contrast floors
+pnpm test                                   # 218 unit tests
+pnpm --filter @decoy/extension contrast # the palette's contrast floors
 pnpm playground                             # the playground, in a real Chrome, rules seeded
-pnpm --filter @mocksmith/extension e2e      # 242 checks, headless
+pnpm --filter @decoy/extension e2e      # 242 checks, headless
 ```
 
 There are two layers, and the split is on purpose. Unit tests cover what is pure — the matcher, the
@@ -373,7 +373,7 @@ with the real extension loaded. It is one artefact with two ways in:
 
 ```bash
 pnpm playground                             # opens it, with the rule set already seeded
-pnpm --filter @mocksmith/extension e2e      # runs the same cases headless, and asserts
+pnpm --filter @decoy/extension e2e      # runs the same cases headless, and asserts
 ```
 
 `pnpm playground` launches a Chrome with the built extension, seeds the 167 rules the cases expect,

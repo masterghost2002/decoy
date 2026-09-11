@@ -14,6 +14,7 @@ import {
   countHits,
   createDefaultConfig,
   createStarterConfig,
+  migrateStorageKeys,
   pruneStats,
   type ExtensionEvent,
   type ExtensionMessage,
@@ -21,24 +22,50 @@ import {
   type DecoyConfig,
   type RuleStats,
   type TrafficEntry,
-} from '@mocksmith/core';
-import { loadConfig } from '@mocksmith/core/schema';
+} from '@decoy/core';
+import { loadConfig } from '@decoy/core/schema';
 
-/*
- * These four keys keep the old product name on purpose. They hold every rule
- * anyone has written, their hit counts and what the traffic log has already
- * seen; renaming them would read as tidiness and land as silent data loss.
- * The name a person sees is not the name a key has to have.
- */
-const STORAGE_KEY = 'mocksmith.config.v1';
+const STORAGE_KEY = 'decoy.config.v1';
 /** Session storage: hit counts belong to a debugging session, not to the profile. */
-const STATS_KEY = 'mocksmith.stats.v1';
+const STATS_KEY = 'decoy.stats.v1';
 /**
  * Session storage: whether any traffic has been recorded since the browser
  * started. It outlives the worker, so a restart that empties the in-memory log
  * can be told apart from a page that simply made no requests.
  */
-const TRAFFIC_SEEN_KEY = 'mocksmith.traffic.seen.v1';
+const TRAFFIC_SEEN_KEY = 'decoy.traffic.seen.v1';
+
+/*
+ * What the config key was called before the product was renamed. It holds every
+ * rule anyone has written, so renaming it is only allowed to be tidiness if
+ * nothing is lost doing it -- which is what the migration below is for. It runs
+ * once, and every read of stored config waits for it.
+ *
+ * The two session keys above are deliberately not migrated: they are emptied
+ * when the browser restarts anyway, so there would be nothing to carry across.
+ */
+const RENAMED_KEYS = [{ from: 'mocksmith.config.v1', to: STORAGE_KEY }];
+
+/**
+ * Awaited by every read of stored config. Created at module scope, so it has
+ * already started by the time anything asks -- and a failure is swallowed
+ * rather than taking the worker down: the worst case is a profile that keeps
+ * its old key and starts empty, which a reload fixes.
+ *
+ * The move itself is in `@decoy/core`, given a storage area rather than
+ * reaching for `chrome.*`, so the case that would actually cost someone their
+ * rules -- both names holding something -- is covered by a test instead of by
+ * hoping.
+ */
+const migration = migrateStorageKeys(chrome.storage.local, RENAMED_KEYS)
+  .then((report) => {
+    if (report.moved.length > 0) {
+      console.info(`[decoy] carried ${String(report.moved.length)} stored key(s) to the new name`);
+    }
+  })
+  .catch((error: unknown) => {
+    console.warn('[decoy] could not migrate stored keys', error);
+  });
 
 const BADGE_ACTIVE_COLOUR = '#f59e0b';
 const BADGE_PAUSED_COLOUR = '#64748b';
@@ -85,6 +112,7 @@ async function persist(config: DecoyConfig): Promise<void> {
 }
 
 async function readStoredConfig(): Promise<unknown> {
+  await migration;
   const stored = await chrome.storage.local.get(STORAGE_KEY);
   return stored[STORAGE_KEY];
 }

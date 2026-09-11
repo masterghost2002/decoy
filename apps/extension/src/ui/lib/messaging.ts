@@ -4,7 +4,7 @@ import type {
   DecoyConfig,
   RuleStats,
   TrafficEntry,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 class WorkerError extends Error {}
 

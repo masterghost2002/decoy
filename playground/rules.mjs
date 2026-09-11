@@ -15,7 +15,7 @@
  * meaningful -- a few groups depend on it deliberately and say so.
  */
 
-export const STORAGE_KEY = 'mocksmith.config.v1';
+export const STORAGE_KEY = 'decoy.config.v1';
 
 /* -------------------------------------------------------------------------- */
 /* The little DSL. Rules are data; this just keeps the data readable.          */

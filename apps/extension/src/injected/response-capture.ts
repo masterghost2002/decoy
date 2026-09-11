@@ -1,4 +1,4 @@
-import { MAX_CAPTURED_BODY } from '@mocksmith/core';
+import { MAX_CAPTURED_BODY } from '@decoy/core';
 
 /**
  * Reading the body of a real response, so "Mock this" can prefill a rule with

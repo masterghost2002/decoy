@@ -13,7 +13,7 @@ import {
   parseCookieString,
   type HeaderPair,
   type RequestFacts,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 import { isRequestObject } from './url.js';
 

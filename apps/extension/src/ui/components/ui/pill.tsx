@@ -1,4 +1,4 @@
-import { METHOD_ANY, type TrafficOutcome } from '@mocksmith/core';
+import { METHOD_ANY, type TrafficOutcome } from '@decoy/core';
 import type { ComponentProps } from 'react';
 
 import { cn } from '@/ui/lib/utils';

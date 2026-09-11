@@ -1,4 +1,4 @@
-import { HTTP_STATUSES, defaultStatusText } from '@mocksmith/core';
+import { HTTP_STATUSES, defaultStatusText } from '@decoy/core';
 import { ChevronDown } from 'lucide-react';
 import { useMemo } from 'react';
 

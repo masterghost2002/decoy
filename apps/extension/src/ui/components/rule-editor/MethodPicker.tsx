@@ -1,4 +1,4 @@
-import { HTTP_METHODS, METHOD_ANY, type MethodPattern } from '@mocksmith/core';
+import { HTTP_METHODS, METHOD_ANY, type MethodPattern } from '@decoy/core';
 import { ChevronDown } from 'lucide-react';
 
 import {

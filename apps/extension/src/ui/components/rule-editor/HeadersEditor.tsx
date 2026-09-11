@@ -1,4 +1,4 @@
-import type { ResponseHeader } from '@mocksmith/core';
+import type { ResponseHeader } from '@decoy/core';
 import { Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/ui/components/ui/button';

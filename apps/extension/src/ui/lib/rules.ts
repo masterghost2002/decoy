@@ -10,7 +10,7 @@ import {
   type ResponseBody,
   type ResponseHeader,
   type TrafficEntry,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 /**
  * Every editor action is a pure config transform. Keeping them here means the

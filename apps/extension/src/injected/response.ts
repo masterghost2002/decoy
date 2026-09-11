@@ -1,4 +1,4 @@
-import type { RespondPlan, StreamPlan } from '@mocksmith/core';
+import type { RespondPlan, StreamPlan } from '@decoy/core';
 
 import { abortReason } from './timing.js';
 

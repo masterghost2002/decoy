@@ -1,5 +1,5 @@
-import { createRule, type MockRule, type DecoyConfig, type TrafficEntry } from '@mocksmith/core';
-import { parseRule } from '@mocksmith/core/schema';
+import { createRule, type MockRule, type DecoyConfig, type TrafficEntry } from '@decoy/core';
+import { parseRule } from '@decoy/core/schema';
 import { describe, expect, it } from 'vitest';
 
 import {

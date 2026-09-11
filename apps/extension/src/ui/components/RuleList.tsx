@@ -5,7 +5,7 @@ import {
   type MockRule,
   type RuleStats,
   type ShadowMap,
-} from '@mocksmith/core';
+} from '@decoy/core';
 import {
   ArrowDown,
   ArrowUp,

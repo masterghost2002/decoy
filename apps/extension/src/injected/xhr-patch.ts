@@ -8,7 +8,7 @@ import {
   type SettledPlan,
   type StreamPlan,
   type TrafficOutcome,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 import {
   assembleRequest,

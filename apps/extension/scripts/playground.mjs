@@ -1,7 +1,7 @@
 /**
  * Opens the playground with everything already wired up.
  *
- *   pnpm --filter @mocksmith/extension build
+ *   pnpm --filter @decoy/extension build
  *   pnpm playground
  *
  * It launches a real Chrome with the built extension loaded, seeds the

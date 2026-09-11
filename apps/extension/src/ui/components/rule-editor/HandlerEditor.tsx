@@ -1,4 +1,4 @@
-import { MAX_HANDLER_TIMEOUT_MS, type MockRule } from '@mocksmith/core';
+import { MAX_HANDLER_TIMEOUT_MS, type MockRule } from '@decoy/core';
 import { Play } from 'lucide-react';
 import { useEffect, useState } from 'react';
 

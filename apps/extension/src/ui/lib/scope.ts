@@ -1,4 +1,4 @@
-import type { TrafficEntry } from '@mocksmith/core';
+import type { TrafficEntry } from '@decoy/core';
 
 /**
  * What just happened on the page in front of you.

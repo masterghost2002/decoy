@@ -29,7 +29,7 @@ import {
   type HandlerOutcome,
   type HandlerReadyMessage,
   type HandlerResultMessage,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 import { compileHandler, describe, formatLogArgument, type CompiledHandler } from './compile.js';
 import { createResponder } from './responder.js';

@@ -1,4 +1,4 @@
-import { firstUrlMatch, matchesUrl, type MockRule } from '@mocksmith/core';
+import { firstUrlMatch, matchesUrl, type MockRule } from '@decoy/core';
 import { useMemo, useState } from 'react';
 
 import { Label } from '@/ui/components/ui/field';

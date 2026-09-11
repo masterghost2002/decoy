@@ -6,9 +6,9 @@ cases you click through when something looks wrong are exactly the ones CI runs,
 ever one definition of working.
 
 ```bash
-pnpm --filter @mocksmith/extension build
+pnpm --filter @decoy/extension build
 pnpm playground                             # opens it, with the rule set already seeded
-pnpm --filter @mocksmith/extension e2e      # runs the same cases headless, and asserts
+pnpm --filter @decoy/extension e2e      # runs the same cases headless, and asserts
 ```
 
 `pnpm playground` launches a Chrome for Testing with the built extension, seeds the rules through

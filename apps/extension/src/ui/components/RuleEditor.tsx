@@ -18,7 +18,7 @@ import {
   type StreamChunk,
   type StreamFormat,
   type UrlMatchMode,
-} from '@mocksmith/core';
+} from '@decoy/core';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 

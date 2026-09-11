@@ -5,7 +5,7 @@ import {
   applyResponseBody,
   type ExtensionEvent,
   type TrafficEntry,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 import { clearTraffic, fetchOwnTabId, fetchTraffic } from '@/ui/lib/messaging';
 

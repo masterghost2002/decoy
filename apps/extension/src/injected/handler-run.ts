@@ -10,7 +10,7 @@ import {
   type RequestFacts,
   type RuleDecision,
   type SettledPlan,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 import type { HandlerClient } from './handler-client.js';
 

@@ -15,7 +15,7 @@ import {
   type ExtensionResponse,
   type DecoyConfig,
   type TrafficEntry,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 /** Traffic is batched: a busy page can report hundreds of requests a second. */
 const FLUSH_INTERVAL_MS = 250;

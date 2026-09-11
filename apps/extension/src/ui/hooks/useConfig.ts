@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ExtensionEvent, DecoyConfig } from '@mocksmith/core';
+import type { ExtensionEvent, DecoyConfig } from '@decoy/core';
 
 import { fetchConfig, saveConfig } from '@/ui/lib/messaging';
 

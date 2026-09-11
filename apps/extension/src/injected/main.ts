@@ -10,7 +10,7 @@ import {
   PAGE_BRIDGE_CHANNEL,
   isBridgeToPageMessage,
   type BridgeFromPageMessage,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 import { createConfigGate } from './config-gate.js';
 import { installFetchPatch } from './fetch-patch.js';

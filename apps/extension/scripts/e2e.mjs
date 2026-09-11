@@ -13,8 +13,8 @@
  * because the service worker already watches `chrome.storage.onChanged` for
  * exactly this case.
  *
- *   pnpm --filter @mocksmith/extension build
- *   pnpm --filter @mocksmith/extension e2e
+ *   pnpm --filter @decoy/extension build
+ *   pnpm --filter @decoy/extension e2e
  *
  * Env: CHROME_PATH to override the binary, E2E_HEADED=1 to watch it happen.
  */

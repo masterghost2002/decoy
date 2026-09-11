@@ -3,7 +3,7 @@ import {
   type MockRule,
   type TrafficEntry,
   type TrafficOutcome,
-} from '@mocksmith/core';
+} from '@decoy/core';
 import { Radio, Trash2, Wand2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 

@@ -6,7 +6,7 @@ import {
   type TrafficEntry,
   type TrafficOutcome,
   type TrafficTransport,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 /** What the page knows about a request. The tab and page url are added later. */
 export interface TrafficDraft {

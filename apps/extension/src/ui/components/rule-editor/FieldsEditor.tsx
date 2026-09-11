@@ -1,4 +1,4 @@
-import { createId } from '@mocksmith/core';
+import { createId } from '@decoy/core';
 import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
 

@@ -1,4 +1,4 @@
-import { checkJson, formatJson, type ResponseBody, type ResponseBodyType } from '@mocksmith/core';
+import { checkJson, formatJson, type ResponseBody, type ResponseBodyType } from '@decoy/core';
 import { ChevronDown, ChevronUp, Maximize2, Search, X } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 

@@ -1,4 +1,4 @@
-import type { StreamFormat } from '@mocksmith/core';
+import type { StreamFormat } from '@decoy/core';
 
 /**
  * The format a loaded file is plainly in, or `null` when it is not plain.

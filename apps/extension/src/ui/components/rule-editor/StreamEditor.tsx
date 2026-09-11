@@ -6,7 +6,7 @@ import {
   encodeStreamChunk,
   type StreamChunk,
   type StreamFormat,
-} from '@mocksmith/core';
+} from '@decoy/core';
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 import { useMemo, type ReactNode } from 'react';
 

@@ -10,6 +10,7 @@ export * from './id.js';
 export * from './json.js';
 export * from './matching.js';
 export * from './messaging.js';
+export * from './migrate.js';
 export * from './resolve.js';
 export * from './rule.js';
 export * from './shadow.js';

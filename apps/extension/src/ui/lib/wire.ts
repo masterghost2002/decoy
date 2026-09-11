@@ -1,4 +1,4 @@
-import type { SettledPlan } from '@mocksmith/core';
+import type { SettledPlan } from '@decoy/core';
 
 /**
  * A plan as the bytes it becomes.

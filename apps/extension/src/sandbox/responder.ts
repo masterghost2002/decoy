@@ -4,7 +4,7 @@ import {
   type NetworkErrorType,
   type ResponseHeader,
   type StreamFormat,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 /**
  * The `res` object a handler is given, and the rules for reading what it

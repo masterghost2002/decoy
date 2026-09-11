@@ -5,7 +5,7 @@ import {
   type HandlerCallMessage,
   type HandlerOutcome,
   type HandlerRequest,
-} from '@mocksmith/core';
+} from '@decoy/core';
 
 /**
  * The page's side of the handler sandbox.

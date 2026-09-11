@@ -1,4 +1,4 @@
-import { resolveAction, type MockRule } from '@mocksmith/core';
+import { resolveAction, type MockRule } from '@decoy/core';
 import { useMemo } from 'react';
 
 import { UrlMatchTester } from '@/ui/components/rule-editor/UrlMatchTester';

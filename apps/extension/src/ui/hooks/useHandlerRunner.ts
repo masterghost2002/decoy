@@ -5,7 +5,7 @@ import {
   urlCaptures,
   type MockRule,
   type SettledPlan,
-} from '@mocksmith/core';
+} from '@decoy/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { createHandlerClient, type HandlerClient } from '@/injected/handler-client';

@@ -13,9 +13,14 @@ export interface PanelFrame {
   height: number;
 }
 
-// Keeps the old product name: renaming the key would forget where every
-// existing panel was put. See the note in the service worker.
-const STORAGE_KEY = 'mocksmith.panel.frame.v1';
+const STORAGE_KEY = 'decoy.panel.frame.v1';
+/*
+ * What it was called before the rename. Read as a fallback rather than
+ * migrated, because forgetting where a panel was put is a small enough loss
+ * that a migration would be the more expensive mistake -- and the next drag
+ * writes it under the new name.
+ */
+const LEGACY_STORAGE_KEY = 'mocksmith.panel.frame.v1';
 
 /** Below this the two-pane layout has nowhere to go and the form stops working. */
 export const MIN_WIDTH = 420;
@@ -63,8 +68,8 @@ function isFrame(value: unknown): value is PanelFrame {
 
 export async function loadFrame(): Promise<PanelFrame> {
   try {
-    const stored = await chrome.storage.local.get(STORAGE_KEY);
-    const raw: unknown = stored[STORAGE_KEY];
+    const stored = await chrome.storage.local.get([STORAGE_KEY, LEGACY_STORAGE_KEY]);
+    const raw: unknown = stored[STORAGE_KEY] ?? stored[LEGACY_STORAGE_KEY];
     return clampFrame(isFrame(raw) ? raw : defaultFrame());
   } catch {
     return defaultFrame();

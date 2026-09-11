@@ -1,4 +1,4 @@
-import type { TrafficEntry, TrafficOutcome } from '@mocksmith/core';
+import type { TrafficEntry, TrafficOutcome } from '@decoy/core';
 import { describe, expect, it } from 'vitest';
 
 import { EMPTY_PAGE_SCOPE, summarizeScope } from '../scope';

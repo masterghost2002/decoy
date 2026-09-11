@@ -11,7 +11,13 @@ export type ThemeChoice = (typeof THEME_CHOICES)[number];
  * Flipping the theme must not rewrite the rules or wake every content script,
  * so it gets its own key.
  */
-const THEME_KEY = 'mocksmith.theme.v1';
+const THEME_KEY = 'decoy.theme.v1';
+/*
+ * What the key was called before the product was renamed. Read as a fallback
+ * rather than migrated: a theme is a preference, not data, and the next change
+ * writes it under the new name. Reading both costs one extra key in one get.
+ */
+const LEGACY_THEME_KEY = 'mocksmith.theme.v1';
 
 function isThemeChoice(value: unknown): value is ThemeChoice {
   return typeof value === 'string' && (THEME_CHOICES as readonly string[]).includes(value);
@@ -48,9 +54,9 @@ export function useTheme(): ThemeState {
   useEffect(() => {
     let cancelled = false;
 
-    void chrome.storage.local.get(THEME_KEY).then((stored) => {
+    void chrome.storage.local.get([THEME_KEY, LEGACY_THEME_KEY]).then((stored) => {
       if (cancelled) return;
-      const raw: unknown = stored[THEME_KEY];
+      const raw: unknown = stored[THEME_KEY] ?? stored[LEGACY_THEME_KEY];
       if (!isThemeChoice(raw)) return;
       setThemeState(raw);
       applyTheme(raw);

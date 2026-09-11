@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { PAGE_BRIDGE_CHANNEL } from '@mocksmith/core';
+import { PAGE_BRIDGE_CHANNEL } from '@decoy/core';
 import { describe, expect, it } from 'vitest';
 
 /**
  * The playground is served as plain files with no build step, so it cannot
- * import from `@mocksmith/core` and keeps its own copy of the two strings it
+ * import from `@decoy/core` and keeps its own copy of the two strings it
  * shares with the extension. A copy that drifts fails in the most confusing way
  * available -- the harness silently stops seeing any config, and every case
  * reports "not seeded" against a perfectly good rule set.

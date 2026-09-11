@@ -1,4 +1,4 @@
-import type { HeaderPair, MockRule, TrafficEntry } from '@mocksmith/core';
+import type { HeaderPair, MockRule, TrafficEntry } from '@decoy/core';
 import { Check, Copy, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 

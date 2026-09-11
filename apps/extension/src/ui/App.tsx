@@ -4,7 +4,7 @@ import {
   type MockRule,
   type DecoyConfig,
   type TrafficEntry,
-} from '@mocksmith/core';
+} from '@decoy/core';
 import {
   MousePointerClick,
   PanelLeftClose,

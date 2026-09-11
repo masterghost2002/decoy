@@ -16,6 +16,7 @@ import {
   createStarterConfig,
   migrateStorageKeys,
   pruneStats,
+  AGENT_DEFAULT_PORT,
   type ExtensionEvent,
   type ExtensionMessage,
   type ExtensionResponse,
@@ -24,6 +25,14 @@ import {
   type TrafficEntry,
 } from '@decoy/core';
 import { loadConfig } from '@decoy/core/schema';
+
+import {
+  AGENT_STORAGE_KEY,
+  createAgentBridge,
+  readAgentSettings,
+  type AgentSettings,
+  type AgentStatus,
+} from './agent.js';
 
 const STORAGE_KEY = 'decoy.config.v1';
 /** Session storage: hit counts belong to a debugging session, not to the profile. */
@@ -44,7 +53,12 @@ const TRAFFIC_SEEN_KEY = 'decoy.traffic.seen.v1';
  * The two session keys above are deliberately not migrated: they are emptied
  * when the browser restarts anyway, so there would be nothing to carry across.
  */
-const RENAMED_KEYS = [{ from: 'mocksmith.config.v1', to: STORAGE_KEY }];
+const RENAMED_KEYS = [
+  { from: 'mocksmith.config.v1', to: STORAGE_KEY },
+  // Holds the token agent control was switched on with. Losing it would turn
+  // the feature off without saying so.
+  { from: 'mocksmith.agent.v1', to: AGENT_STORAGE_KEY },
+];
 
 /**
  * Awaited by every read of stored config. Created at module scope, so it has
@@ -102,6 +116,75 @@ const tabMockCounts = new Map<number, number>();
  * has to be tracked, or a panel would show a traffic log that never updates.
  */
 const panelTabs = new Set<number>();
+
+/* -------------------------------------------------------------------------- */
+/* Agent control                                                              */
+/* -------------------------------------------------------------------------- */
+
+let agentSettings: AgentSettings | null = null;
+
+/**
+ * The bridge is given functions rather than importing this module back, so it
+ * stays testable in node and cannot grow an opinion about how config is stored.
+ */
+const agent = createAgentBridge({
+  getConfig,
+  replaceConfig: (config) => replaceConfig(config),
+  getTraffic: () => trafficLog,
+  clearTraffic: () => {
+    trafficLog = [];
+    trafficEverSeen = false;
+    void chrome.storage.session.remove(TRAFFIC_SEEN_KEY).catch(() => undefined);
+    notifyUi({ type: 'traffic:added', entries: [] });
+  },
+  onStatusChange: (status) => {
+    notifyUi(agentEvent(status));
+  },
+});
+
+function agentEvent(status: AgentStatus): ExtensionEvent {
+  return {
+    type: 'agent:changed',
+    enabled: agentSettings?.enabled ?? false,
+    port: agentSettings?.port ?? AGENT_DEFAULT_PORT,
+    token: agentSettings?.token ?? '',
+    state: status.state,
+    detail: status.detail,
+  };
+}
+
+/**
+ * A token, generated here rather than by the bridge.
+ *
+ * The direction matters: switching agent control on is an act in the extension,
+ * and the secret that permits it should be minted by the side doing the
+ * permitting. The bridge only ever learns the token because a person pasted it
+ * into their own agent's configuration.
+ */
+function mintToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function getAgentSettings(): Promise<AgentSettings> {
+  if (agentSettings !== null) return agentSettings;
+  await migration;
+  const stored = await chrome.storage.local.get(AGENT_STORAGE_KEY);
+  const read = readAgentSettings(stored[AGENT_STORAGE_KEY]);
+  // Off, with a token already minted: turning it on should be one switch, not
+  // a switch and then a wait for a secret to appear.
+  agentSettings = read ?? { enabled: false, port: AGENT_DEFAULT_PORT, token: mintToken() };
+  return agentSettings;
+}
+
+async function writeAgentSettings(next: AgentSettings): Promise<AgentSettings> {
+  agentSettings = next;
+  await chrome.storage.local.set({ [AGENT_STORAGE_KEY]: next });
+  agent.apply(next);
+  notifyUi(agentEvent(agent.status()));
+  return next;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Config                                                                     */
@@ -345,6 +428,12 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** A port the browser will actually let a socket open, or the one already set. */
+function clampPort(port: number, fallback: number): number {
+  if (!Number.isInteger(port) || port < 1024 || port > 65_535) return fallback;
+  return port;
+}
+
 async function handleMessage(
   message: ExtensionMessage,
   sender: chrome.runtime.MessageSender,
@@ -417,6 +506,54 @@ async function handleMessage(
     case 'tab:whoami':
       return { ok: true, kind: 'tab', tabId: sender.tab?.id ?? null };
 
+    case 'agent:get': {
+      const current = await getAgentSettings();
+      const status = agent.status();
+      return {
+        ok: true,
+        kind: 'agent',
+        enabled: current.enabled,
+        port: current.port,
+        token: current.token,
+        state: status.state,
+        detail: status.detail,
+      };
+    }
+
+    case 'agent:set': {
+      const current = await getAgentSettings();
+      const written = await writeAgentSettings({
+        ...current,
+        enabled: message.enabled,
+        port: clampPort(message.port, current.port),
+      });
+      const status = agent.status();
+      return {
+        ok: true,
+        kind: 'agent',
+        enabled: written.enabled,
+        port: written.port,
+        token: written.token,
+        state: status.state,
+        detail: status.detail,
+      };
+    }
+
+    case 'agent:rotate': {
+      const current = await getAgentSettings();
+      const written = await writeAgentSettings({ ...current, token: mintToken() });
+      const status = agent.status();
+      return {
+        ok: true,
+        kind: 'agent',
+        enabled: written.enabled,
+        port: written.port,
+        token: written.token,
+        state: status.state,
+        detail: status.detail,
+      };
+    }
+
     default:
       return { ok: false, error: `Unknown message: ${JSON.stringify(message)}` };
   }
@@ -439,6 +576,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  */
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'local') return;
+
+  /*
+   * Agent settings, changed by something other than this worker. The UI's own
+   * writes come in as messages and never reach here, so in practice this is a
+   * second surface -- or a test -- and either way the bridge has to follow the
+   * settings rather than the settings following the bridge.
+   */
+  const agentChange = changes[AGENT_STORAGE_KEY];
+  if (agentChange !== undefined) {
+    const next = readAgentSettings(agentChange.newValue);
+    if (next !== null && JSON.stringify(next) !== JSON.stringify(agentSettings)) {
+      agentSettings = next;
+      agent.apply(next);
+      notifyUi(agentEvent(agent.status()));
+    }
+  }
+
   const change = changes[STORAGE_KEY];
   if (change === undefined) return;
 
@@ -496,3 +650,11 @@ chrome.runtime.onStartup.addListener(() => {
 void getConfig().then(updateBadge);
 void restoreStats();
 void restoreTrafficSeen();
+/*
+ * On every wake-up, not only on install: MV3 shuts this worker down whenever it
+ * is idle, and an agent's connection has to come back with it or the first tool
+ * call after a quiet minute would fail for no visible reason.
+ */
+void getAgentSettings().then((current) => {
+  agent.apply(current);
+});

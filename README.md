@@ -15,9 +15,10 @@ that usually means editing the app to throw on purpose, then remembering to take
 Decoy moves that into the browser, where it belongs: match a request by url, answer it with
 whatever status, body, headers or failure you want, and flip it off when you are done.
 
-**Status: slice 1.** `fetch` and `XMLHttpRequest` are fully intercepted and verified end to end.
-The layers for static resources, WebSockets, scenario sharing and MCP control are designed for but
-not built — see [Roadmap](#roadmap).
+**Status: slice 1, plus agent control.** `fetch` and `XMLHttpRequest` are fully intercepted and
+verified end to end, and an agent can drive the whole of it over MCP — see
+[Agents](#agents). The layers for static resources, WebSockets and scenario sharing are designed
+for but not built — see [Roadmap](#roadmap).
 
 ## Quick start
 
@@ -90,6 +91,10 @@ rules; the page owns the decision.
   the service worker and the UI. The injected bundle is 12 kB minified as a result.
 - **`apps/extension`** — the MV3 surfaces: service worker, content bridge, injected script, and a
   React 19 + Vite + Tailwind 4 + shadcn UI shared by the popup and the full tab.
+- **`apps/mcp`** — the MCP server, so an agent can drive Decoy while it writes the code that calls
+  the endpoint being mocked. It is transport and phrasing only: every command's effect on a rule
+  set lives in `packages/core/src/agent.ts`, pure and unit-tested, so the agent path and the UI
+  path cannot disagree. See [Agents](#agents).
 - **`playground`** — the behavioural test suite, which is also a page you can open and click
   through. No build step and no framework: it is the thing you reach for when the extension is
   misbehaving, and a bundler between you and it would be exactly the wrong complexity in that
@@ -351,14 +356,77 @@ this one matches.
 
 ![A rule flagged as never firing, with a button to move it above the rule shadowing it](docs/screenshots/shadow-detection.png)
 
+## Agents
+
+An agent building a feature already knows the shape it expects back, long before the endpoint
+exists. Decoy is how it says so — and how it reads back what the page actually asked for when the
+answer turns out to be wrong.
+
+```bash
+# In Chrome: Decoy → the agent button → switch Agent control on, and copy the block it shows.
+```
+
+![Agent control: one switch, a port, a token, and the config block to paste](docs/screenshots/agent-control-light.png)
+
+```json
+{
+  "mcpServers": {
+    "decoy": {
+      "command": "npx",
+      "args": ["-y", "@decoy/mcp"],
+      "env": { "DECOY_TOKEN": "…", "DECOY_PORT": "8787" }
+    }
+  }
+}
+```
+
+Twelve tools, in the same vocabulary the UI uses: list, get, create, update, enable, move and
+delete rules; pause or resume mocking; read and clear the traffic log; and ask which rule would
+answer a given url. A rule is described the way someone would say it rather than the way it is
+stored:
+
+```json
+{ "url": "/api/users", "methods": ["GET"], "respond": { "status": 200, "json": { "items": [] } } }
+```
+
+### How it is wired, and why that way
+
+```
+agent  ──stdio/MCP──▶  decoy-mcp  ◀──WebSocket──  Chrome service worker
+                       127.0.0.1                   (dials out; never listens)
+```
+
+The direction is forced, and turns out to be right twice over. An MV3 service worker cannot listen
+for connections — but it can open one, so the browser decides what it talks to rather than
+accepting whatever arrives. And an open socket resets the worker's idle timer, which quietly solves
+the other MV3 problem: a worker that goes to sleep in the middle of a conversation.
+
+Three things guard it, because a socket that can rewrite what your app sees is not something to
+enable quietly:
+
+- **Off by default**, switched on in the extension. The side granting permission is the side that
+  mints the secret; the bridge only ever learns the token because a person pasted it into their own
+  agent's config.
+- **Loopback only.** There is no case where the agent and the browser are on different machines.
+- **A token on every connection.** A mismatch is closed with `4401`, which the extension reads as
+  *stop retrying and say why* rather than flapping. The end-to-end run asserts exactly that: a
+  bridge with the wrong token never gets a browser.
+
+Everything an agent sends is validated by the same schema the UI's own writes go through, and a
+rule the worker refuses is reported rather than dropped — an agent told its rule was written when
+it was not will confidently build on top of that.
+
+There is deliberately no gold anywhere on the agent surface. Gold means one thing in this product —
+requests are being intercepted — and an agent being connected is not that.
+
 ## Testing
 
 ```bash
 pnpm typecheck                              # every package
-pnpm test                                   # 218 unit tests
-pnpm --filter @decoy/extension contrast # the palette's contrast floors
+pnpm test                                   # 248 unit tests
+pnpm --filter @decoy/extension contrast     # the palette's contrast floors
 pnpm playground                             # the playground, in a real Chrome, rules seeded
-pnpm --filter @decoy/extension e2e      # 242 checks, headless
+pnpm --filter @decoy/extension e2e          # 253 checks, headless
 ```
 
 There are two layers, and the split is on purpose. Unit tests cover what is pure — the matcher, the
@@ -432,6 +500,13 @@ that it mounts, that a colour token declared on `:host` resolves inside it, that
 rounded, that the detail sheet lands inside the shadow root rather than in the page, and that a
 second toggle takes it away again.
 
+It finishes on the agent bridge, driving the *real* one out of `apps/mcp/dist` rather than a stub
+that could still speak an older protocol. The unit tests prove the handshake and the command logic;
+only this proves the service worker actually dials out — so it writes a rule over the socket,
+checks the page sees it without a reload, checks it landed in the real config, reads it back out of
+the traffic log, deletes it, and confirms a bridge holding the wrong token never gets a browser at
+all.
+
 > **E2E needs a Chrome for Testing build.** Chrome 137+ ignores `--load-extension` on the stable
 > channel, so an installed Chrome cannot load an unpacked extension from the command line. The
 > script finds a build already cached by Playwright or Puppeteer; otherwise run
@@ -494,6 +569,12 @@ The extension asks for `storage`, `scripting`, and `<all_urls>` host access, and
 `scripting` is what injects the floating panel into the tab you ask for it in, on demand — it is
 not used to put anything on a page you did not ask for.
 
+**Agent control adds a socket, and it is off until you switch it on.** When on, the service worker
+opens one outgoing WebSocket to `127.0.0.1` and authenticates with a token this extension generated
+and showed you. Anything holding that token can read the traffic log and rewrite the rules, which
+is the same power the UI has and no more — no cross-origin reach, no extension privilege, nothing
+outside this machine. Rotating the token in the panel invalidates whatever it was pasted into.
+
 ## Roadmap
 
 Ordered by how much each unblocks:
@@ -513,9 +594,7 @@ Ordered by how much each unblocks:
    example bodies.
 6. **Sharing** — export/import a config file first, then a small service so a team shares scenario
    sets instead of screenshotting them.
-7. **MCP server** — a local server bridged to the extension so Claude and other agents can list,
-   add and activate rules, and read the traffic log, while driving a browser.
-8. **Layer 3 (`chrome.debugger`)** — opt-in deep mode for true status + body control over any
+7. **Layer 3 (`chrome.debugger`)** — opt-in deep mode for true status + body control over any
    resource type, with a clear fallback when DevTools is already attached.
 
 ## Contributing

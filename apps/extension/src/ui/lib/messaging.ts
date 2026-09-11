@@ -112,3 +112,37 @@ export function announcePanel(attached: boolean): void {
     .sendMessage({ type: attached ? 'panel:attached' : 'panel:detached' })
     .catch(() => undefined);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Agent control                                                              */
+/* -------------------------------------------------------------------------- */
+
+export interface AgentState {
+  enabled: boolean;
+  port: number;
+  token: string;
+  state: 'off' | 'connecting' | 'connected' | 'refused' | 'error';
+  /** What went wrong, in words, for the panel to print rather than a code. */
+  detail: string;
+}
+
+function asAgentState(response: ExtensionResponse): AgentState {
+  if (response.ok !== true || response.kind !== 'agent') {
+    throw new WorkerError('Unexpected reply to an agent message.');
+  }
+  const { enabled, port, token, state, detail } = response;
+  return { enabled, port, token, state, detail };
+}
+
+export async function fetchAgentState(): Promise<AgentState> {
+  return asAgentState(await send({ type: 'agent:get' }));
+}
+
+export async function saveAgentState(enabled: boolean, port: number): Promise<AgentState> {
+  return asAgentState(await send({ type: 'agent:set', enabled, port }));
+}
+
+/** A new token. Whatever the old one was pasted into stops working at once. */
+export async function rotateAgentToken(): Promise<AgentState> {
+  return asAgentState(await send({ type: 'agent:rotate' }));
+}

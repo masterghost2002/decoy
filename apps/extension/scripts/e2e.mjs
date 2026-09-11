@@ -40,6 +40,8 @@ const PAGE_PORT = Number(process.env.E2E_PAGE_PORT ?? 4399);
 /* The second origin the cross-origin cases need. Below the page port, so a
    playground left running on 4400/4401 does not collide with a test run. */
 const ALT_PORT = PAGE_PORT - 1;
+/** The agent bridge, and one above it for the wrong-token check. */
+const AGENT_PORT = Number(process.env.E2E_AGENT_PORT ?? 18_787);
 const HEADED = process.env.E2E_HEADED === '1';
 /** When set, the run also writes PNGs of each UI surface here for visual review. */
 const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR ?? null;
@@ -299,6 +301,184 @@ async function captureSurfaces(cdp, sessionId, extensionId) {
 
 /* -------------------------------------------------------------------------- */
 /* Run                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/* Agent control                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Drives Decoy the way an MCP client does: start the real bridge, switch agent
+ * control on the way the UI does, then make the browser do real work over the
+ * socket.
+ *
+ * The bridge is imported from `apps/mcp/dist`, not reimplemented here, so a
+ * change to the protocol breaks this rather than quietly passing against a stub
+ * that still speaks the old one.
+ */
+async function checkAgentBridge(cdp, workerSession) {
+  const result = {
+    connected: false,
+    status: null,
+    created: false,
+    storedInConfig: false,
+    answered: 0,
+    winsNamed: false,
+    updateKeptUrl: false,
+    sawTraffic: false,
+    deleted: false,
+    refusedMissing: false,
+    refusedBadToken: false,
+  };
+
+  const { Bridge } = await import('../../mcp/dist/bridge.js').catch(() => {
+    throw new Error(
+      'apps/mcp/dist is missing. Run `pnpm build` before `pnpm e2e`: the agent checks drive the real bridge.',
+    );
+  });
+
+  const token = 'e2e-token-not-a-secret';
+
+  const bridge = new Bridge({ port: AGENT_PORT, token, connectWaitMs: 8000 });
+  await bridge.listen();
+
+  /*
+   * Written straight to storage, not sent as a message: `sendMessage` from
+   * inside the worker never reaches the worker's own listener, and the
+   * `storage.onChanged` path is the one a second surface uses anyway.
+   */
+  const setAgent = (enabled, port) =>
+    evaluate(
+      cdp,
+      workerSession,
+      `(async () => {
+         await chrome.storage.local.set({
+           'decoy.agent.v1': { enabled: ${String(enabled)}, port: ${String(port)}, token: ${JSON.stringify(token)} },
+         });
+         return 'written';
+       })()`,
+    );
+
+  try {
+    await setAgent(true, AGENT_PORT);
+
+    result.connected = await bridge.waitForBrowser(8000);
+    if (!result.connected) return result;
+
+    result.status = await bridge.call({ kind: 'status' });
+
+    /* Create. A rule from an agent goes to the top, because position is the
+       whole priority model and one underneath a broad rule does nothing. */
+    const created = await bridge.call({
+      kind: 'rules.create',
+      spec: {
+        name: 'Written by an agent',
+        url: '/pg/agent/probe',
+        respond: { status: 418, json: { via: 'agent' } },
+      },
+    });
+    const ruleId = created?.rule?.id ?? '';
+    result.created = created?.rule?.index === 0 && ruleId.length > 0;
+
+    /* In the real config, through the validation every write goes through --
+       not in a side table only the agent can see. */
+    const stored = await evaluate(
+      cdp,
+      workerSession,
+      `(async () => {
+         const bag = await chrome.storage.local.get('decoy.config.v1');
+         const rules = bag['decoy.config.v1']?.rules ?? [];
+         const rule = rules.find((entry) => entry.id === ${JSON.stringify(ruleId)});
+         return rule === undefined ? null : { name: rule.name, status: rule.action.status };
+       })()`,
+    );
+    result.storedInConfig = stored?.name === 'Written by an agent' && stored.status === 418;
+
+    /* The page has to see it now: a rule that only takes effect after a reload
+       is a rule an agent cannot usefully write. */
+    const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+    const probeSession = await attach(cdp, targetId);
+    await cdp.send('Page.enable', {}, probeSession);
+    await cdp.send('Runtime.enable', {}, probeSession);
+    const probeLoaded = cdp.waitForEvent('Page.loadEventFired', probeSession);
+    await cdp.send(
+      'Page.navigate',
+      { url: `http://127.0.0.1:${String(PAGE_PORT)}/` },
+      probeSession,
+    );
+    await probeLoaded;
+    await sleep(400);
+    result.answered = await evaluate(
+      cdp,
+      probeSession,
+      `fetch('/pg/agent/probe').then((response) => response.status)`,
+    );
+
+    const wins = await bridge.call({
+      kind: 'match.test',
+      url: `http://127.0.0.1:${String(PAGE_PORT)}/pg/agent/probe`,
+    });
+    result.winsNamed = wins?.matched === true && wins.rule?.id === ruleId;
+
+    /* An update naming only a status must not drop the url it matches on. */
+    await bridge.call({ kind: 'rules.update', id: ruleId, spec: { respond: { status: 503 } } });
+    const afterUpdate = await bridge.call({ kind: 'rules.get', id: ruleId });
+    result.updateKeptUrl =
+      afterUpdate?.matcher?.url?.value === '/pg/agent/probe' && afterUpdate.action?.status === 503;
+
+    /* Traffic is batched by the content bridge before it reaches the worker,
+       so the honest assertion is "it turns up", not "it is there this
+       millisecond". */
+    for (let attempt = 0; attempt < 10 && !result.sawTraffic; attempt += 1) {
+      const traffic = await bridge.call({
+        kind: 'traffic.list',
+        limit: 50,
+        urlContains: '/pg/agent/probe',
+      });
+      result.sawTraffic = (traffic?.entries ?? []).some((entry) =>
+        entry.url.includes('/pg/agent/probe'),
+      );
+      if (!result.sawTraffic) await sleep(200);
+    }
+
+    await bridge.call({ kind: 'rules.delete', id: ruleId });
+    result.deleted = await evaluate(
+      cdp,
+      probeSession,
+      `fetch('/pg/agent/probe').then((response) => response.json()).then((body) => body.server === true)`,
+    );
+
+    // A command for a rule that is gone has to be refused. Silently doing
+    // nothing is the failure mode an agent builds on top of.
+    result.refusedMissing = await bridge
+      .call({ kind: 'rules.get', id: ruleId })
+      .then(() => false)
+      .catch(() => true);
+
+    /* The security property: a bridge with a different token gets nothing. The
+       extension closes on 4401 and stops retrying, which is why this second
+       bridge never sees a browser. */
+    const impostor = new Bridge({
+      port: AGENT_PORT + 1,
+      token: 'the-wrong-token',
+      connectWaitMs: 500,
+    });
+    await impostor.listen();
+    await setAgent(true, AGENT_PORT + 1);
+    await sleep(1500);
+    result.refusedBadToken = !impostor.connected;
+    impostor.close();
+  } finally {
+    // Left switched off, so a run leaves the profile as it found it.
+    await setAgent(false, AGENT_PORT).catch(() => undefined);
+    bridge.close();
+  }
+
+  return result;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Main                                                                       */
 /* -------------------------------------------------------------------------- */
 
 async function main() {
@@ -1066,6 +1246,16 @@ async function main() {
     await sleep(900);
     const afterToggle = await evaluate(cdp, hostSession, inspectPanel);
 
+    /*
+     * Agent control, against the real bridge.
+     *
+     * The unit tests prove the protocol; none of them proves the service worker
+     * actually dials out, which is the half that can silently stop working. So
+     * this starts the bridge an MCP server starts, writes the settings the UI
+     * writes, and then asks the browser to do real work through it.
+     */
+    const agent = await checkAgentBridge(cdp, workerSession);
+
     console.log('');
     const uiChecks = [
       ['ui: renders the seeded rules', ui.showsSeededRule],
@@ -1216,6 +1406,21 @@ async function main() {
         panelCollapse.restored === true && panelCollapse.keptContent === true,
       ],
       ['panel: a second toggle takes it away again', afterToggle.mounted === false],
+
+      ['agent: the worker connects out to the bridge', agent.connected],
+      [
+        `agent: status comes back over the socket (${String(agent.status?.rules ?? 0)} rules)`,
+        agent.status?.mocking === true && (agent.status?.rules ?? 0) > 0,
+      ],
+      ['agent: a rule an agent wrote lands at the top, where it wins', agent.created],
+      ['agent: it is in the real config, validated like any other write', agent.storedInConfig],
+      [`agent: the page sees it immediately (${String(agent.answered)})`, agent.answered === 418],
+      ['agent: which-rule-wins names the rule that answered', agent.winsNamed],
+      ['agent: an update keeps the fields it did not mention', agent.updateKeptUrl],
+      ['agent: the traffic log is readable over the bridge', agent.sawTraffic],
+      ['agent: deleting it lets the page reach the network again', agent.deleted],
+      ['agent: a command for a rule that is gone is refused, not ignored', agent.refusedMissing],
+      ['agent: a bridge with the wrong token never gets a browser', agent.refusedBadToken],
     ];
     for (const [name, ok] of uiChecks) {
       console.log(`${ok ? '\u001b[32mPASS\u001b[0m' : '\u001b[31mFAIL\u001b[0m'}  ${name}`);

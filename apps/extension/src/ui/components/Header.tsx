@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 
+import { AgentPanel } from '@/ui/components/AgentPanel';
 import { Button } from '@/ui/components/ui/button';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from '@/ui/components/ui/menu';
 import { Switch } from '@/ui/components/ui/switch';
@@ -105,6 +106,8 @@ export function Header({
         onCheckedChange={onToggle}
         aria-label={enabled ? 'Pause all mocking' : 'Resume mocking'}
       />
+
+      <AgentPanel />
 
       <Menu>
         <MenuTrigger asChild>

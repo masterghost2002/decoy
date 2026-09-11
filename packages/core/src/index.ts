@@ -1,5 +1,6 @@
 // Public surface of the pure engine. Deliberately free of zod so the bundle
 // injected into every page stays small; validation lives in `./schema`.
+export * from './agent.js';
 export * from './conditions.js';
 export * from './config.js';
 export * from './engine.js';

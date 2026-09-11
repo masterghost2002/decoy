@@ -125,7 +125,7 @@ export function App({ view }: { view: ViewKind }) {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="flex h-full min-h-0 flex-col bg-paper">
       <Header
         enabled={config.enabled}
         enabledRuleCount={countEnabledRules(config)}
@@ -136,7 +136,7 @@ export function App({ view }: { view: ViewKind }) {
       />
 
       {error !== null ? (
-        <p role="alert" className="bg-destructive px-3 py-1 text-xs text-destructive-foreground">
+        <p role="alert" className="bg-danger px-3.5 py-1.5 text-[11px] font-medium text-white">
           {error}
         </p>
       ) : null}
@@ -153,7 +153,7 @@ export function App({ view }: { view: ViewKind }) {
           <TabsTrigger value="traffic">
             Traffic
             {traffic.entries.length > 0 ? (
-              <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+              <span className="ml-1.5 text-ink-muted">
                 {traffic.entries.length}
               </span>
             ) : null}
@@ -162,7 +162,7 @@ export function App({ view }: { view: ViewKind }) {
 
         <TabsContent value="rules">
           {useSplitLayout ? (
-            <div className="grid h-full min-h-0 grid-cols-[minmax(260px,340px)_1fr] divide-x divide-border">
+            <div className="grid h-full min-h-0 grid-cols-[minmax(280px,360px)_1fr] divide-x divide-hairline">
               <div className="min-w-0">{list}</div>
               <div className="min-w-0">
                 {editorRule === null ? (
@@ -200,9 +200,9 @@ export function App({ view }: { view: ViewKind }) {
 function LoadingState() {
   return (
     <div className="flex h-full flex-col gap-2 p-3" aria-busy="true" aria-label="Loading rules">
-      <div className="h-8 animate-pulse rounded-md bg-muted" />
-      <div className="h-8 w-2/3 animate-pulse rounded-md bg-muted" />
-      <div className="h-8 w-1/2 animate-pulse rounded-md bg-muted" />
+      <div className="h-8 animate-pulse rounded-lg bg-sunk" />
+      <div className="h-8 w-2/3 animate-pulse rounded-lg bg-sunk" />
+      <div className="h-8 w-1/2 animate-pulse rounded-lg bg-sunk" />
     </div>
   );
 }

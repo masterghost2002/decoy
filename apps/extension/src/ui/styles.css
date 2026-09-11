@@ -1,79 +1,134 @@
 @import 'tailwindcss';
 
+/* Weight axis only, and the latin subsets: enough for a UI, none of the bulk. */
+@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+
 /*
- * Palette: slate neutrals with a single amber accent, matching the toolbar
- * icon. Amber reads as "held / intercepted", which is what the tool does, and
- * it keeps the surface from looking like every other generated dashboard.
+ * Warm editorial palette: near-black ink with a brown cast, paper-white
+ * surfaces, and a single goldenrod accent. Gold earns its keep by meaning
+ * exactly one thing -- "this is intercepting" -- so it is never spent on
+ * ordinary buttons.
  *
- * Light and dark both ship. A tool that lives next to devtools should follow
- * the OS rather than force its own mood.
+ * Structure comes from hairline inset rings and soft warm shadows rather than
+ * hard borders, and hierarchy comes from type and weight rather than colour.
  */
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-muted: #f8fafc;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --primary: #b45309;
-  --primary-foreground: #ffffff;
-  --accent: #fef3c7;
-  --accent-foreground: #78350f;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --success: #15803d;
-  --ring: #f59e0b;
+  --paper: #fafafa;
+  --surface: #ffffff;
+  --sunk: #f1f1f0;
+  --wash: #fdf8ea;
+
+  --ink: #1a1714;
+  --ink-muted: #6b655d;
+  --ink-faint: #a8a299;
+
+  --gold: #d9a520;
+  --gold-bright: #edb512;
+  --gold-soft: #f6e5b0;
+  --gold-ink: #2e2206;
+
+  --ok: #2f8f5b;
+  --info: #2563a8;
+  --warn: #b0700c;
+  --danger: #b3372b;
+
+  --hairline: rgba(26, 23, 20, 0.1);
+  --hairline-strong: rgba(26, 23, 20, 0.18);
+
+  --shadow-soft: 0 1px 2px rgba(40, 28, 12, 0.04), 0 4px 14px -6px rgba(40, 28, 12, 0.1);
+  --shadow-pop: 0 2px 6px rgba(40, 28, 12, 0.06), 0 18px 40px -16px rgba(40, 28, 12, 0.22);
+  --shadow-raised:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.5), 0 1px 1px rgba(40, 28, 12, 0.08),
+    0 4px 12px -6px rgba(176, 127, 12, 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0b1120;
-    --foreground: #e2e8f0;
-    --card: #111827;
-    --card-muted: #0f172a;
-    --muted: #1e293b;
-    --muted-foreground: #94a3b8;
-    --border: #1e293b;
-    --border-strong: #334155;
-    --primary: #f59e0b;
-    --primary-foreground: #1c1917;
-    --accent: #422006;
-    --accent-foreground: #fcd34d;
-    --destructive: #f87171;
-    --destructive-foreground: #1c1917;
-    --success: #4ade80;
-    --ring: #f59e0b;
+    --paper: #141210;
+    --surface: #1c1917;
+    --sunk: #26221e;
+    --wash: #2a2113;
+
+    --ink: #f2ede5;
+    --ink-muted: #a8a096;
+    --ink-faint: #756e65;
+
+    --gold: #edb512;
+    --gold-bright: #f5c63a;
+    --gold-soft: #57431a;
+    --gold-ink: #fbe9b8;
+
+    --ok: #5fbe87;
+    --info: #7fb2e8;
+    --warn: #e0a94a;
+    --danger: #e8776a;
+
+    --hairline: rgba(242, 237, 229, 0.1);
+    --hairline-strong: rgba(242, 237, 229, 0.18);
+
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px -6px rgba(0, 0, 0, 0.5);
+    --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.35), 0 18px 40px -16px rgba(0, 0, 0, 0.6);
+    --shadow-raised:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 1px 1px rgba(0, 0, 0, 0.3),
+      0 4px 12px -6px rgba(0, 0, 0, 0.5);
   }
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-muted: var(--card-muted);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-ring: var(--ring);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-sunk: var(--sunk);
+  --color-wash: var(--wash);
 
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-gold: var(--gold);
+  --color-gold-bright: var(--gold-bright);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-ink: var(--gold-ink);
+
+  --color-ok: var(--ok);
+  --color-info: var(--info);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-ring: inset 0 0 0 1px var(--hairline);
+  --shadow-ring-strong: inset 0 0 0 1px var(--hairline-strong);
+}
+
+/**
+ * The signature micro-label: mono, uppercase, small, widely tracked. Used for
+ * field labels and section eyebrows so headings never have to shout.
+ */
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/** Columns of numbers have to line up, in tables and in the traffic log. */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 @layer base {
-  * {
-    border-color: var(--border);
-  }
-
   html,
   body {
     height: 100%;
@@ -81,11 +136,12 @@
 
   body {
     margin: 0;
-    background-color: var(--background);
-    color: var(--foreground);
-    font-family:
-      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   /* The popup is a fixed viewport; the tab view fills whatever it gets. */
@@ -99,21 +155,36 @@
     height: 100%;
   }
 
-  :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
+  /* Display sizes get negative tracking; small text gets none. */
+  h1,
+  h2 {
+    letter-spacing: -0.015em;
   }
 
-  /* Slim scrollbars, since most panels here are dense scrolling lists. */
+  :focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: var(--gold-soft);
+    color: var(--gold-ink);
+  }
+
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: var(--border-strong);
+    background-color: var(--hairline-strong);
     border: 3px solid transparent;
     background-clip: content-box;
     border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--ink-faint);
   }
 }

@@ -340,24 +340,34 @@ async function captureSurfaces(cdp, sessionId, extensionId) {
   if (SCREENSHOT_DIR === null) return;
   await mkdir(SCREENSHOT_DIR, { recursive: true });
 
-  const shots = [
+  const surfaces = [
     { name: 'tab-rules', url: `chrome-extension://${extensionId}/tab.html`, width: 1280, height: 860 },
     { name: 'tab-traffic', url: null, width: 1280, height: 860, openTraffic: true },
     { name: 'popup', url: `chrome-extension://${extensionId}/popup.html`, width: 420, height: 600 },
   ];
 
+  // Both themes ship, so both get reviewed.
+  const shots = ['light', 'dark'].flatMap((scheme) =>
+    surfaces.map((surface) => ({ ...surface, scheme, name: `${surface.name}-${scheme}` })),
+  );
+
   for (const shot of shots) {
+    await cdp.send(
+      'Emulation.setEmulatedMedia',
+      { features: [{ name: 'prefers-color-scheme', value: shot.scheme }] },
+      sessionId,
+    );
     await cdp.send(
       'Emulation.setDeviceMetricsOverride',
       { width: shot.width, height: shot.height, deviceScaleFactor: 2, mobile: false },
       sessionId,
     );
 
-    if (shot.url !== null) {
-      const loaded = cdp.waitForEvent('Page.loadEventFired', sessionId);
-      await cdp.send('Page.navigate', { url: shot.url }, sessionId);
-      await loaded;
-    }
+    const target = shot.url ?? `chrome-extension://${extensionId}/tab.html`;
+    const loaded = cdp.waitForEvent('Page.loadEventFired', sessionId);
+    await cdp.send('Page.navigate', { url: target }, sessionId);
+    await loaded;
+    await sleep(400);
     if (shot.openTraffic === true) {
       await evaluate(
         cdp,

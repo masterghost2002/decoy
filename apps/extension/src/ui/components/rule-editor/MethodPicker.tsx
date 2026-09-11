@@ -4,6 +4,18 @@ import { cn } from '@/ui/lib/utils';
 
 const OPTIONS: MethodPattern[] = [METHOD_ANY, ...HTTP_METHODS];
 
+/** Same colour language as the method pills in the lists, so the two read alike. */
+const SELECTED_TONE: Record<string, string> = {
+  '*': 'border-gold/50 bg-wash text-warn',
+  GET: 'border-ok/45 bg-ok/10 text-ok',
+  POST: 'border-info/45 bg-info/10 text-info',
+  PUT: 'border-warn/50 bg-warn/10 text-warn',
+  PATCH: 'border-warn/50 bg-warn/10 text-warn',
+  DELETE: 'border-danger/45 bg-danger/10 text-danger',
+  HEAD: 'border-hairline-strong bg-sunk text-ink',
+  OPTIONS: 'border-hairline-strong bg-sunk text-ink',
+};
+
 export interface MethodPickerProps {
   value: MethodPattern[];
   onChange: (next: MethodPattern[]) => void;
@@ -45,13 +57,13 @@ export function MethodPicker({ value, onChange }: MethodPickerProps) {
               toggle(method);
             }}
             className={cn(
-              'rounded border px-1.5 py-0.5 font-mono text-[11px] font-semibold transition-colors',
+              'rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.06em] transition-colors',
               selected
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border-strong text-muted-foreground hover:bg-muted hover:text-foreground',
+                ? SELECTED_TONE[method]
+                : 'border-hairline text-ink-faint hover:border-hairline-strong hover:text-ink-muted',
             )}
           >
-            {method === METHOD_ANY ? 'ANY' : method}
+            {method === METHOD_ANY ? 'any' : method}
           </button>
         );
       })}

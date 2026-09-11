@@ -5,14 +5,17 @@ import { useId } from 'react';
 import { cn } from '@/ui/lib/utils';
 
 export function Label({ className, ...props }: ComponentProps<typeof LabelPrimitive.Root>) {
+  return <LabelPrimitive.Root className={cn('eyebrow', className)} {...props} />;
+}
+
+/** Section divider with a mono eyebrow, borrowed from editorial layouts. */
+export function SectionHeading({ children }: { children: ReactNode }) {
   return (
-    <LabelPrimitive.Root
-      className={cn(
-        'text-[11px] font-medium uppercase tracking-wide text-muted-foreground',
-        className,
-      )}
-      {...props}
-    />
+    <div className="flex items-center gap-2">
+      <span aria-hidden className="size-1.5 rotate-45 bg-gold" />
+      <h3 className="eyebrow">{children}</h3>
+      <span aria-hidden className="h-px flex-1 bg-hairline" />
+    </div>
   );
 }
 
@@ -25,21 +28,17 @@ export interface FieldProps {
   className?: string;
 }
 
-/**
- * Pairs a label with a control and reserves one line for a hint or error, so a
- * validation message never reflows the form under the user's cursor.
- */
 export function Field({ label, children, hint, error, className }: FieldProps) {
   const controlId = useId();
   const message = error ?? hint;
 
   return (
-    <div className={cn('flex flex-col gap-1', className)}>
+    <div className={cn('flex flex-col gap-1.5', className)}>
       <Label htmlFor={controlId}>{label}</Label>
       {children(controlId)}
       {message !== undefined && message !== null && message.length > 0 ? (
         <p
-          className={cn('text-xs', error ? 'text-destructive' : 'text-muted-foreground')}
+          className={cn('text-[11px] leading-snug', error ? 'text-danger' : 'text-ink-muted')}
           role={error ? 'alert' : undefined}
         >
           {message}

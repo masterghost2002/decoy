@@ -2,8 +2,8 @@ import type { ResponseHeader } from '@mocksmith/core';
 import { Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/ui/components/ui/button';
-import { Input } from '@/ui/components/ui/input';
 import { Label } from '@/ui/components/ui/field';
+import { Input } from '@/ui/components/ui/input';
 
 export interface HeadersEditorProps {
   headers: ResponseHeader[];
@@ -16,7 +16,7 @@ export function HeadersEditor({ headers, onChange }: HeadersEditorProps) {
   };
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <Label>Response headers</Label>
         <Button
@@ -32,7 +32,7 @@ export function HeadersEditor({ headers, onChange }: HeadersEditorProps) {
       </div>
 
       {headers.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] leading-snug text-ink-muted">
           Content-Type is set automatically from the body type.
         </p>
       ) : (
@@ -62,7 +62,7 @@ export function HeadersEditor({ headers, onChange }: HeadersEditorProps) {
                 autoComplete="off"
               />
               <Button
-                size="icon"
+                size="icon-sm"
                 variant="ghost"
                 aria-label={`Remove header ${header.name.length > 0 ? header.name : String(index + 1)}`}
                 onClick={() => {

@@ -111,6 +111,29 @@ Some deliberate decisions worth knowing:
 - **Aborted and timed-out requests are logged too**, since those are usually the ones you are
   chasing.
 
+## Design
+
+The surface is deliberately quiet, because it sits next to DevTools and gets read at a glance
+rather than admired.
+
+- **Warm neutrals, one accent.** A near-black ink with a brown cast (`#1A1714`), paper surfaces,
+  and goldenrod as the only accent. Gold means exactly one thing — *requests are being
+  intercepted* — so it is spent on the master switch, the active rule's rail, and nothing else.
+  Ordinary primary buttons get a soft gold fill, not a saturated one.
+- **Colour carries category, not hierarchy.** Methods and status classes are outlined mono pills
+  with their own colours (GET green, POST blue, DELETE red, 4xx amber, 5xx red), so a row is
+  readable without a legend. The number or word is always present too — colour is never the only
+  signal.
+- **Mono micro-labels.** Field labels and section eyebrows are uppercase IBM Plex Mono at 10px with
+  wide tracking, which lets headings stay small and the content stay dominant.
+- **Structure from hairlines and soft shadows**, not hard borders: an inset 1px ring plus a warm
+  ambient shadow. Controls sit in recessed wells; buttons and pills are raised.
+- **Both themes ship**, following the OS. `pnpm e2e` with `E2E_SCREENSHOT_DIR` set renders every
+  surface in both so a change can be reviewed rather than assumed.
+
+Tokens live in `src/ui/styles.css` as CSS variables mapped into Tailwind's theme, so a palette
+change is one file. `eyebrow` and `tabular` are custom utilities.
+
 ## Testing
 
 ```bash

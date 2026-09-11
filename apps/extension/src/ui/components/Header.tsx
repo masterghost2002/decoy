@@ -1,7 +1,7 @@
 import { ExternalLink } from 'lucide-react';
 
-import { Switch } from '@/ui/components/ui/switch';
 import { Button } from '@/ui/components/ui/button';
+import { Switch } from '@/ui/components/ui/switch';
 import { openFullPage } from '@/ui/lib/messaging';
 import { cn } from '@/ui/lib/utils';
 
@@ -14,29 +14,27 @@ export interface HeaderProps {
 
 export function Header({ enabled, onToggle, enabledRuleCount, showOpenInTab }: HeaderProps) {
   return (
-    <header className="flex items-center gap-2 border-b border-border bg-card px-3 py-2">
+    <header className="flex items-center gap-2.5 border-b border-hairline bg-surface px-3.5 py-2.5">
       {/* The real toolbar icon, so the surface and the browser chrome match. */}
       <img
         src={chrome.runtime.getURL('icons/icon-32.png')}
         alt=""
         aria-hidden
-        className="size-5 rounded"
+        className="size-[18px] rounded"
       />
-      <h1 className="text-sm font-semibold tracking-tight">Mocksmith</h1>
+      <h1 className="text-[15px] font-semibold tracking-[-0.02em]">Mocksmith</h1>
 
       <div className="flex-1" />
 
+      {/* The state is spelled out, because colour alone must not carry it. */}
       <span
-        className={cn(
-          'text-xs font-medium',
-          enabled ? 'text-foreground' : 'text-muted-foreground',
-        )}
+        className={cn('eyebrow', enabled ? 'text-warn' : 'text-ink-faint')}
+        aria-live="polite"
       >
-        {/* The word matters: colour alone must not carry "is it on". */}
         {enabled
           ? enabledRuleCount === 0
-            ? 'On, no active rules'
-            : `On, ${String(enabledRuleCount)} active`
+            ? 'On · no rules'
+            : `On · ${String(enabledRuleCount)} active`
           : 'Paused'}
       </span>
       <Switch
@@ -47,7 +45,7 @@ export function Header({ enabled, onToggle, enabledRuleCount, showOpenInTab }: H
 
       {showOpenInTab ? (
         <Button
-          size="icon"
+          size="icon-sm"
           variant="ghost"
           onClick={openFullPage}
           aria-label="Open Mocksmith in a full tab"

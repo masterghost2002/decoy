@@ -8,7 +8,10 @@ export const Tabs = TabsPrimitive.Root;
 export function TabsList({ className, ...props }: ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
-      className={cn('flex shrink-0 gap-4 border-b border-border bg-card px-3', className)}
+      className={cn(
+        'flex shrink-0 gap-5 border-b border-hairline bg-surface px-3.5',
+        className,
+      )}
       {...props}
     />
   );
@@ -21,8 +24,8 @@ export function TabsTrigger({
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        'relative -mb-px border-b-2 border-transparent py-1.5 text-xs font-medium text-muted-foreground transition-colors',
-        'hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground',
+        'eyebrow relative -mb-px border-b-2 border-transparent py-2.5 transition-colors',
+        'hover:text-ink-muted data-[state=active]:border-gold data-[state=active]:text-ink',
         className,
       )}
       {...props}

@@ -12,7 +12,7 @@ export interface StatusPickerProps {
 
 export function StatusPicker({ controlId, value, onChange }: StatusPickerProps) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       <Input
         id={controlId}
         type="number"
@@ -23,7 +23,7 @@ export function StatusPicker({ controlId, value, onChange }: StatusPickerProps) 
           const parsed = Number.parseInt(event.target.value, 10);
           if (!Number.isNaN(parsed)) onChange(parsed);
         }}
-        className="w-20 font-mono"
+        className="w-[4.5rem] font-mono tabular"
       />
       <div className="flex flex-wrap gap-1" role="group" aria-label="Common status codes">
         {PRESETS.map((preset) => (
@@ -35,10 +35,10 @@ export function StatusPicker({ controlId, value, onChange }: StatusPickerProps) 
               onChange(preset);
             }}
             className={cn(
-              'rounded border px-1.5 py-0.5 font-mono text-[11px] transition-colors',
+              'rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium tabular transition-colors',
               value === preset
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border-strong text-muted-foreground hover:bg-muted hover:text-foreground',
+                ? 'border-gold/50 bg-wash text-warn'
+                : 'border-hairline text-ink-faint hover:border-hairline-strong hover:text-ink-muted',
             )}
           >
             {preset}

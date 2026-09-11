@@ -2,10 +2,10 @@ import { METHOD_ANY, type MockRule } from '@mocksmith/core';
 import { ChevronDown, ChevronUp, Copy, ListPlus, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { Badge } from '@/ui/components/ui/badge';
 import { Button } from '@/ui/components/ui/button';
 import { EmptyState } from '@/ui/components/ui/empty-state';
 import { Input } from '@/ui/components/ui/input';
+import { MethodPill, Pill, StatusPill } from '@/ui/components/ui/pill';
 import { Switch } from '@/ui/components/ui/switch';
 import { cn } from '@/ui/lib/utils';
 
@@ -22,14 +22,14 @@ export interface RuleListProps {
   onCreate: () => void;
 }
 
-function describeAction(rule: MockRule): { text: string; tone: 'accent' | 'danger' | 'outline' } {
+function ActionSummary({ rule }: { rule: MockRule }) {
   switch (rule.action.kind) {
     case 'respond':
-      return { text: String(rule.action.status), tone: 'accent' };
+      return <StatusPill status={rule.action.status} />;
     case 'networkError':
-      return { text: rule.action.errorType, tone: 'danger' };
+      return <Pill className="border-danger/35 text-danger">{rule.action.errorType}</Pill>;
     case 'passthrough':
-      return { text: 'real', tone: 'outline' };
+      return <Pill className="border-hairline-strong text-ink-faint">real</Pill>;
   }
 }
 
@@ -55,11 +55,11 @@ export function RuleList({
   }, [rules, query]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <h2 className="flex-1 text-sm font-semibold">
+    <div className="flex h-full min-h-0 flex-col bg-paper">
+      <div className="flex items-center gap-2 border-b border-hairline bg-surface px-3.5 py-2">
+        <h2 className="eyebrow flex-1">
           Rules
-          <span className="ml-1.5 font-normal text-muted-foreground">{rules.length}</span>
+          <span className="ml-1.5 text-ink-muted">{rules.length}</span>
         </h2>
         <Button size="sm" variant="primary" onClick={onCreate}>
           <Plus />
@@ -68,7 +68,7 @@ export function RuleList({
       </div>
 
       {rules.length >= FILTER_THRESHOLD ? (
-        <div className="border-b border-border px-3 py-2">
+        <div className="border-b border-hairline bg-surface px-3.5 py-2">
           <Input
             type="search"
             value={query}
@@ -97,12 +97,11 @@ export function RuleList({
         <EmptyState
           icon={ListPlus}
           title="No matching rules"
-          description={`Nothing matches "${query}". Clear the filter to see all ${String(rules.length)} rules.`}
+          description={`Nothing matches “${query}”. Clear the filter to see all ${String(rules.length)} rules.`}
         />
       ) : (
-        <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
+        <ul className="min-h-0 flex-1 divide-y divide-hairline overflow-y-auto">
           {visibleRules.map((rule) => {
-            const action = describeAction(rule);
             const position = rules.indexOf(rule);
             const isSelected = rule.id === selectedRuleId;
 
@@ -110,8 +109,12 @@ export function RuleList({
               <li
                 key={rule.id}
                 className={cn(
-                  'group flex items-center gap-2 px-3 py-2',
-                  isSelected ? 'bg-accent/40' : 'hover:bg-card-muted',
+                  'group flex items-center gap-2.5 border-l-2 py-1.5 pr-2 pl-3',
+                  // A gold rail plus a warm wash, rather than a filled block:
+                  // selection should not shout louder than the rule's own state.
+                  isSelected
+                    ? 'border-gold bg-wash'
+                    : 'border-transparent hover:bg-surface',
                 )}
               >
                 <Switch
@@ -132,22 +135,24 @@ export function RuleList({
                 >
                   <span
                     className={cn(
-                      'block truncate text-sm',
-                      rule.enabled ? 'text-foreground' : 'text-muted-foreground',
+                      'block truncate text-[13px] font-medium',
+                      rule.enabled ? 'text-ink' : 'text-ink-faint',
                     )}
                   >
                     {rule.name.length > 0 ? rule.name : 'Untitled rule'}
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5">
-                    <span className="font-mono text-[10px] font-semibold text-muted-foreground">
-                      {rule.matcher.methods.includes(METHOD_ANY)
-                        ? 'ANY'
-                        : rule.matcher.methods.join(' ')}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                    <MethodPill
+                      method={
+                        rule.matcher.methods.includes(METHOD_ANY) || rule.matcher.methods.length > 1
+                          ? METHOD_ANY
+                          : (rule.matcher.methods[0] ?? METHOD_ANY)
+                      }
+                    />
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink-muted">
                       {rule.matcher.url.value}
                     </span>
-                    <Badge tone={action.tone}>{action.text}</Badge>
+                    <ActionSummary rule={rule} />
                   </span>
                 </button>
 
@@ -193,8 +198,8 @@ export function RuleList({
         </ul>
       )}
 
-      <p className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">
-        First enabled match wins. Reorder to change priority.
+      <p className="eyebrow border-t border-hairline bg-surface px-3.5 py-2">
+        First enabled match wins
       </p>
     </div>
   );

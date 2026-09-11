@@ -58,10 +58,7 @@ export function useTheme(): ThemeState {
 
     // The popup and the full tab can be open at once, and a theme flip in one
     // should not leave the other disagreeing.
-    const onChanged = (
-      changes: Record<string, chrome.storage.StorageChange>,
-      areaName: string,
-    ) => {
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
       if (areaName !== 'local') return;
       const change = changes[THEME_KEY];
       if (change === undefined) return;

@@ -184,7 +184,10 @@ describe('urlCaptures', () => {
 
   it('reads named groups out of a regex pattern', () => {
     expect(
-      urlCaptures(matcher('regex', '/users/(?<id>\\d+)/posts/(?<postId>\\d+)'), 'https://x.dev/users/42/posts/7'),
+      urlCaptures(
+        matcher('regex', '/users/(?<id>\\d+)/posts/(?<postId>\\d+)'),
+        'https://x.dev/users/42/posts/7',
+      ),
     ).toEqual({ 0: '42', 1: '7', id: '42', postId: '7' });
   });
 
@@ -259,7 +262,11 @@ describe('shadowing, with handlers in the list', () => {
 
   it('reports a handler as an uncertain winner in the url tester', () => {
     const rules = [
-      rule({ id: 'gate', matcher: url('/api/users'), action: createHandlerAction('return next();') }),
+      rule({
+        id: 'gate',
+        matcher: url('/api/users'),
+        action: createHandlerAction('return next();'),
+      }),
       rule({ id: 'users', matcher: url('/api/users') }),
     ];
     const outcome = firstUrlMatch(rules, 'https://x.dev/api/users');
@@ -293,9 +300,9 @@ describe('findMatchingRuleFrom', () => {
   it('resumes below a rule, which is what next() needs', () => {
     const found = findMatchingRuleFrom(config(rules), { url: '/api/users', method: 'GET' }, 1);
     expect(found?.rule.id).toBe('b');
-    expect(findMatchingRuleFrom(config(rules), { url: '/api/users', method: 'GET' }, 2)?.rule.id).toBe(
-      'c',
-    );
+    expect(
+      findMatchingRuleFrom(config(rules), { url: '/api/users', method: 'GET' }, 2)?.rule.id,
+    ).toBe('c');
   });
 
   it('runs out rather than wrapping around, so next() cannot loop forever', () => {

@@ -14,17 +14,21 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/ui/components/ui/button';
 import { Label, SectionHeading } from '@/ui/components/ui/field';
 import { Input, Select } from '@/ui/components/ui/input';
-import {
-  Segmented,
-  segmentedHint,
-  type SegmentedOption,
-} from '@/ui/components/ui/segmented';
+import { Segmented, segmentedHint, type SegmentedOption } from '@/ui/components/ui/segmented';
 import { Switch } from '@/ui/components/ui/switch';
 import { cn } from '@/ui/lib/utils';
 
 const CONDITION_MODE_OPTIONS: Array<SegmentedOption<ConditionMode>> = [
-  { value: 'all', label: 'All', hint: 'Every enabled condition has to hold for the rule to match.' },
-  { value: 'any', label: 'Any', hint: 'One enabled condition holding is enough for the rule to match.' },
+  {
+    value: 'all',
+    label: 'All',
+    hint: 'Every enabled condition has to hold for the rule to match.',
+  },
+  {
+    value: 'any',
+    label: 'Any',
+    hint: 'One enabled condition holding is enough for the rule to match.',
+  },
 ];
 
 const SOURCE_LABEL: Record<ConditionSource, string> = {
@@ -97,8 +101,8 @@ export function ConditionsEditor({
 
       {conditions.length === 0 ? (
         <p className="text-[12px] leading-relaxed text-ink-muted">
-          No conditions: every request matching the url and method is taken. Add one to narrow
-          the rule by header, cookie, query parameter or payload.
+          No conditions: every request matching the url and method is taken. Add one to narrow the
+          rule by header, cookie, query parameter or payload.
         </p>
       ) : (
         <>

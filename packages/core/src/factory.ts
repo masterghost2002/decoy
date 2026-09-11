@@ -2,13 +2,7 @@ import type { ConditionSource, RuleCondition } from './conditions.js';
 import { DEFAULT_HANDLER_TIMEOUT_MS } from './handler.js';
 import { createId } from './id.js';
 import { METHOD_ANY } from './http.js';
-import type {
-  MockRule,
-  NetworkErrorType,
-  RuleAction,
-  StreamChunk,
-  StreamFormat,
-} from './rule.js';
+import type { MockRule, NetworkErrorType, RuleAction, StreamChunk, StreamFormat } from './rule.js';
 
 export function createRespondAction(status = 200): Extract<RuleAction, { kind: 'respond' }> {
   return {

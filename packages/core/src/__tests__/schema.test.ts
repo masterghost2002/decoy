@@ -38,9 +38,9 @@ describe('mockRuleSchema defaults', () => {
         matcher: { url: { mode: 'glob', value: 'x' } },
       }).success,
     ).toBe(false);
-    expect(
-      mockRuleSchema.safeParse({ ...validRule, action: { kind: 'explode' } }).success,
-    ).toBe(false);
+    expect(mockRuleSchema.safeParse({ ...validRule, action: { kind: 'explode' } }).success).toBe(
+      false,
+    );
   });
 });
 

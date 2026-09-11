@@ -68,12 +68,7 @@ export interface HandlerPlan {
   timeoutMs: number;
 }
 
-export type MockPlan =
-  | RespondPlan
-  | StreamPlan
-  | HandlerPlan
-  | NetworkErrorPlan
-  | PassthroughPlan;
+export type MockPlan = RespondPlan | StreamPlan | HandlerPlan | NetworkErrorPlan | PassthroughPlan;
 
 /**
  * A plan that is an answer: everything except `handler`, which is an

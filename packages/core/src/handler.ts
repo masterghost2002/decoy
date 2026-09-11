@@ -307,9 +307,7 @@ export function actionFromHandlerOutcome(
     statusText: outcome.statusText,
     headers: outcome.headers,
     body:
-      outcome.body === null
-        ? { type: 'empty' }
-        : { type: outcome.bodyType, value: outcome.body },
+      outcome.body === null ? { type: 'empty' } : { type: outcome.bodyType, value: outcome.body },
     delayMs: outcome.delayMs,
   };
 }

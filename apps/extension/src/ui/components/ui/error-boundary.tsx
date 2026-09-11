@@ -46,9 +46,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       >
         <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Decoy hit a bug</h2>
         <p className="max-w-[60ch] text-[13px] leading-relaxed text-ink-muted">
-          The interface stopped rendering. Nothing was lost — the rules are stored in the
-          extension, not on this screen, and requests are still being intercepted by the rules
-          that were already saved.
+          The interface stopped rendering. Nothing was lost — the rules are stored in the extension,
+          not on this screen, and requests are still being intercepted by the rules that were
+          already saved.
         </p>
         <pre className="max-h-64 overflow-auto rounded-xl bg-sunk p-2.5 font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-ink shadow-ring">
           {error.message}

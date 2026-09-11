@@ -1,3 +1,10 @@
+/*
+ * `abortReason` returns whatever the caller passed to `abort(reason)`, which is
+ * frequently not an Error -- and reporting it verbatim is the whole point, so
+ * the rejections built from it cannot be Errors either.
+ */
+/* eslint-disable @typescript-eslint/prefer-promise-reject-errors */
+
 /**
  * Produces the rejection value the platform would use for an aborted request:
  * the signal's own reason when it has one, otherwise a stock AbortError.

@@ -80,10 +80,7 @@ describe('wildcard matching', () => {
     ).toBe(true);
     // Grouping and repetition characters do appear in real paths and stay literal.
     expect(
-      matchesUrl(
-        matcher({ mode: 'wildcard', value: '*/a+b/(c)/*' }),
-        'https://x.test/a+b/(c)/d',
-      ),
+      matchesUrl(matcher({ mode: 'wildcard', value: '*/a+b/(c)/*' }), 'https://x.test/a+b/(c)/d'),
     ).toBe(true);
   });
 
@@ -121,14 +118,22 @@ describe('urls pasted without a scheme', () => {
   const PASTED = 'api.example.com/v1/users';
 
   it('matches in the anchored modes', () => {
-    expect(matchesUrl(matcher({ mode: 'equals', value: 'api.example.com/v1/users?page=2' }), API_URL)).toBe(true);
+    expect(
+      matchesUrl(matcher({ mode: 'equals', value: 'api.example.com/v1/users?page=2' }), API_URL),
+    ).toBe(true);
     expect(matchesUrl(matcher({ mode: 'startsWith', value: PASTED }), API_URL)).toBe(true);
-    expect(matchesUrl(matcher({ mode: 'wildcard', value: 'api.example.com/v1/*' }), API_URL)).toBe(true);
+    expect(matchesUrl(matcher({ mode: 'wildcard', value: 'api.example.com/v1/*' }), API_URL)).toBe(
+      true,
+    );
   });
 
   it('still respects a scheme when one is given', () => {
-    expect(matchesUrl(matcher({ mode: 'startsWith', value: 'http://api.example.com' }), API_URL)).toBe(false);
-    expect(matchesUrl(matcher({ mode: 'startsWith', value: 'https://api.example.com' }), API_URL)).toBe(true);
+    expect(
+      matchesUrl(matcher({ mode: 'startsWith', value: 'http://api.example.com' }), API_URL),
+    ).toBe(false);
+    expect(
+      matchesUrl(matcher({ mode: 'startsWith', value: 'https://api.example.com' }), API_URL),
+    ).toBe(true);
   });
 
   it('does not quietly widen startsWith to bare paths', () => {
@@ -141,13 +146,23 @@ describe('matchesRequest', () => {
     const request = { url: API_URL, method: 'GET' };
     expect(
       matchesRequest(
-        { url: matcher({ mode: 'contains', value: '/v1/users' }), methods: ['GET'], conditions: [], conditionMode: 'all' },
+        {
+          url: matcher({ mode: 'contains', value: '/v1/users' }),
+          methods: ['GET'],
+          conditions: [],
+          conditionMode: 'all',
+        },
         request,
       ),
     ).toBe(true);
     expect(
       matchesRequest(
-        { url: matcher({ mode: 'contains', value: '/v1/users' }), methods: ['POST'], conditions: [], conditionMode: 'all' },
+        {
+          url: matcher({ mode: 'contains', value: '/v1/users' }),
+          methods: ['POST'],
+          conditions: [],
+          conditionMode: 'all',
+        },
         request,
       ),
     ).toBe(false);

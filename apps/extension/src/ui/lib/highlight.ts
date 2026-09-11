@@ -22,13 +22,7 @@
  */
 
 export type TokenKind =
-  | 'plain'
-  | 'key'
-  | 'string'
-  | 'number'
-  | 'keyword'
-  | 'comment'
-  | 'punctuation';
+  'plain' | 'key' | 'string' | 'number' | 'keyword' | 'comment' | 'punctuation';
 
 export interface Token {
   text: string;
@@ -115,11 +109,48 @@ export function tokenizeJson(source: string): Token[] {
 }
 
 const JS_KEYWORDS = new Set([
-  'async', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
-  'default', 'delete', 'do', 'else', 'export', 'extends', 'finally', 'for', 'from',
-  'function', 'if', 'import', 'in', 'instanceof', 'let', 'new', 'of', 'return', 'static',
-  'super', 'switch', 'this', 'throw', 'try', 'typeof', 'var', 'void', 'while', 'yield',
-  'true', 'false', 'null', 'undefined',
+  'async',
+  'await',
+  'break',
+  'case',
+  'catch',
+  'class',
+  'const',
+  'continue',
+  'debugger',
+  'default',
+  'delete',
+  'do',
+  'else',
+  'export',
+  'extends',
+  'finally',
+  'for',
+  'from',
+  'function',
+  'if',
+  'import',
+  'in',
+  'instanceof',
+  'let',
+  'new',
+  'of',
+  'return',
+  'static',
+  'super',
+  'switch',
+  'this',
+  'throw',
+  'try',
+  'typeof',
+  'var',
+  'void',
+  'while',
+  'yield',
+  'true',
+  'false',
+  'null',
+  'undefined',
 ]);
 
 /**

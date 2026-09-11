@@ -6,12 +6,7 @@ import {
   type SettledPlan,
 } from '@mocksmith/core';
 
-import {
-  assembleRequest,
-  collectFetchBody,
-  collectFetchHeaders,
-  headersToPairs,
-} from './facts.js';
+import { assembleRequest, collectFetchBody, collectFetchHeaders, headersToPairs } from './facts.js';
 import type { ConfigGate } from './config-gate.js';
 import type { HandlerClient } from './handler-client.js';
 import { settleDecision } from './handler-run.js';
@@ -48,6 +43,9 @@ function networkError(errorType: NetworkErrorType): unknown {
 }
 
 export function installFetchPatch(context: FetchPatchContext): void {
+  // Unbound on purpose: the patch calls it back as `nativeFetch(...)`, which is
+  // how `window.fetch` is invoked everywhere anyway.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const nativeFetch = window.fetch;
   if (typeof nativeFetch !== 'function') return;
 
@@ -200,5 +198,5 @@ export function installFetchPatch(context: FetchPatchContext): void {
     writable: true,
   });
 
-  window.fetch = patchedFetch as typeof window.fetch;
+  window.fetch = patchedFetch;
 }

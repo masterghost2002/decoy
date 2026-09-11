@@ -68,7 +68,7 @@ export function collectFetchHeaders(input: RequestInfo | URL, init?: RequestInit
   try {
     // `new Headers(...)` normalizes every accepted shape: Headers, record, and
     // array-of-tuples alike.
-    return headersToPairs(new Headers(source as HeadersInit));
+    return headersToPairs(new Headers(source));
   } catch {
     return [];
   }

@@ -1,0 +1,12 @@
+dist/
+node_modules/
+coverage/
+pnpm-lock.yaml
+*.png
+*.woff
+*.woff2
+
+# Markdown is prose, wrapped by hand at the width it reads best. Padding the
+# tables would make every later edit re-wrap a column, and the formatter has
+# opinions about emphasis markers that are not worth arguing with.
+*.md

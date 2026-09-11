@@ -57,13 +57,15 @@ describe('ruleCovers', () => {
   });
 
   it('covers equals, startsWith and endsWith with a contains substring', () => {
-    expect(ruleCovers(rule('a', '/api'), rule('b', 'app.local/api/users', { mode: 'equals' }))).toBe(
-      true,
-    );
+    expect(
+      ruleCovers(rule('a', '/api'), rule('b', 'app.local/api/users', { mode: 'equals' })),
+    ).toBe(true);
     expect(
       ruleCovers(rule('a', '/api'), rule('b', 'https://app.local/api', { mode: 'startsWith' })),
     ).toBe(true);
-    expect(ruleCovers(rule('a', 'users'), rule('b', '/api/users', { mode: 'endsWith' }))).toBe(true);
+    expect(ruleCovers(rule('a', 'users'), rule('b', '/api/users', { mode: 'endsWith' }))).toBe(
+      true,
+    );
   });
 
   it('covers a longer prefix with a shorter prefix', () => {
@@ -83,7 +85,9 @@ describe('ruleCovers', () => {
     expect(ruleCovers(rule('a', '/api/*', { mode: 'wildcard' }), rule('b', '/api/users'))).toBe(
       false,
     );
-    expect(ruleCovers(rule('a', '/api/.*', { mode: 'regex' }), rule('b', '/api/users'))).toBe(false);
+    expect(ruleCovers(rule('a', '/api/.*', { mode: 'regex' }), rule('b', '/api/users'))).toBe(
+      false,
+    );
   });
 
   it('treats a bare wildcard as universal', () => {
@@ -102,7 +106,10 @@ describe('ruleCovers', () => {
       ),
     ).toBe(false);
     expect(
-      ruleCovers(rule('a', '/api', { methods: ['GET'] }), rule('b', '/api/users', { methods: ['*'] })),
+      ruleCovers(
+        rule('a', '/api', { methods: ['GET'] }),
+        rule('b', '/api/users', { methods: ['*'] }),
+      ),
     ).toBe(false);
     expect(
       ruleCovers(
@@ -132,9 +139,9 @@ describe('ruleCovers', () => {
   });
 
   it('folds case when the outer rule is case-insensitive', () => {
-    expect(
-      ruleCovers(rule('a', '/api'), rule('b', '/API/USERS', { caseSensitive: true })),
-    ).toBe(true);
+    expect(ruleCovers(rule('a', '/api'), rule('b', '/API/USERS', { caseSensitive: true }))).toBe(
+      true,
+    );
   });
 
   it('never treats an empty pattern as covering anything', () => {
@@ -169,7 +176,11 @@ describe('findShadowedRules', () => {
   });
 
   it('reports the earliest shadowing rule, not the closest', () => {
-    const rules = [rule('first', '/api'), rule('second', '/api/v1'), rule('third', '/api/v1/users')];
+    const rules = [
+      rule('first', '/api'),
+      rule('second', '/api/v1'),
+      rule('third', '/api/v1/users'),
+    ];
     expect(findShadowedRules(rules)['third']?.shadowedBy).toBe('first');
   });
 

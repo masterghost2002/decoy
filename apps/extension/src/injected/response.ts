@@ -56,7 +56,10 @@ export function buildMockResponse(plan: RespondPlan, url: string): Response {
  * `intervalMs`. A plan with `repeat: 0` never closes, which is the point: an
  * event source that ends on its own is not the thing being mocked.
  */
-function createChunkStream(plan: StreamPlan, signal: AbortSignal | null): ReadableStream<Uint8Array> {
+function createChunkStream(
+  plan: StreamPlan,
+  signal: AbortSignal | null,
+): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let detachAbort: (() => void) | null = null;

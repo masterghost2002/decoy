@@ -122,7 +122,9 @@ export type BridgeFromPageMessage =
       truncated: boolean;
     };
 
-function isChannelMessage(data: unknown): data is { channel: string; direction: string; kind: string } {
+function isChannelMessage(
+  data: unknown,
+): data is { channel: string; direction: string; kind: string } {
   if (typeof data !== 'object' || data === null) return false;
   const candidate = data as Record<string, unknown>;
   return (

@@ -104,7 +104,5 @@ export function MenuLabel({
   className,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.Label>) {
-  return (
-    <DropdownMenuPrimitive.Label className={cn('eyebrow px-2 py-1', className)} {...props} />
-  );
+  return <DropdownMenuPrimitive.Label className={cn('eyebrow px-2 py-1', className)} {...props} />;
 }

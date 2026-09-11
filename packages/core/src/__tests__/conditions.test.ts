@@ -34,15 +34,24 @@ describe('header conditions', () => {
   it('reads a header case-insensitively by name', () => {
     expect(
       evaluateCondition(
-        condition({ source: 'header', key: 'Authorization', operator: 'startsWith', value: 'Bearer ' }),
+        condition({
+          source: 'header',
+          key: 'Authorization',
+          operator: 'startsWith',
+          value: 'Bearer ',
+        }),
         facts,
       ),
     ).toBe(true);
   });
 
   it('distinguishes absent from empty', () => {
-    expect(evaluateCondition(condition({ key: 'x-tenant', operator: 'notExists' }), facts)).toBe(true);
-    expect(evaluateCondition(condition({ key: 'authorization', operator: 'exists' }), facts)).toBe(true);
+    expect(evaluateCondition(condition({ key: 'x-tenant', operator: 'notExists' }), facts)).toBe(
+      true,
+    );
+    expect(evaluateCondition(condition({ key: 'authorization', operator: 'exists' }), facts)).toBe(
+      true,
+    );
   });
 
   it('cannot match a value when the header is absent', () => {
@@ -64,16 +73,25 @@ describe('cookie, query and body conditions', () => {
 
   it('matches a query parameter', () => {
     expect(
-      evaluateCondition(condition({ source: 'query', key: 'role', operator: 'equals', value: 'admin' }), facts),
+      evaluateCondition(
+        condition({ source: 'query', key: 'role', operator: 'equals', value: 'admin' }),
+        facts,
+      ),
     ).toBe(true);
     expect(
-      evaluateCondition(condition({ source: 'query', key: 'page', operator: 'gt', value: '1' }), facts),
+      evaluateCondition(
+        condition({ source: 'query', key: 'page', operator: 'gt', value: '1' }),
+        facts,
+      ),
     ).toBe(true);
   });
 
   it('matches raw body text', () => {
     expect(
-      evaluateCondition(condition({ source: 'body', operator: 'contains', value: '"role":"admin"' }), facts),
+      evaluateCondition(
+        condition({ source: 'body', operator: 'contains', value: '"role":"admin"' }),
+        facts,
+      ),
     ).toBe(true);
   });
 });
@@ -87,23 +105,35 @@ describe('json path conditions', () => {
       ),
     ).toBe(true);
     expect(
-      evaluateCondition(condition({ source: 'jsonPath', key: 'tags.1', operator: 'equals', value: 'b' }), facts),
+      evaluateCondition(
+        condition({ source: 'jsonPath', key: 'tags.1', operator: 'equals', value: 'b' }),
+        facts,
+      ),
     ).toBe(true);
     expect(
-      evaluateCondition(condition({ source: 'jsonPath', key: 'user.age', operator: 'gt', value: '30' }), facts),
+      evaluateCondition(
+        condition({ source: 'jsonPath', key: 'user.age', operator: 'gt', value: '30' }),
+        facts,
+      ),
     ).toBe(true);
   });
 
   it('treats an unparseable body as absent rather than throwing', () => {
     const broken = createRequestFacts({ url: 'https://x/y', method: 'POST', body: 'not json{' });
     expect(
-      evaluateCondition(condition({ source: 'jsonPath', key: 'a.b', operator: 'notExists' }), broken),
+      evaluateCondition(
+        condition({ source: 'jsonPath', key: 'a.b', operator: 'notExists' }),
+        broken,
+      ),
     ).toBe(true);
   });
 
   it('never matches on an invalid regex', () => {
     expect(
-      evaluateCondition(condition({ key: 'authorization', operator: 'matches', value: '([' }), facts),
+      evaluateCondition(
+        condition({ key: 'authorization', operator: 'matches', value: '([' }),
+        facts,
+      ),
     ).toBe(false);
   });
 });
@@ -135,6 +165,11 @@ describe('fact parsing', () => {
   });
 
   it('joins repeated headers the way the platform reports them', () => {
-    expect(headerPairsToRecord([['Accept', 'a'], ['accept', 'b']])).toEqual({ accept: 'a, b' });
+    expect(
+      headerPairsToRecord([
+        ['Accept', 'a'],
+        ['accept', 'b'],
+      ]),
+    ).toEqual({ accept: 'a, b' });
   });
 });

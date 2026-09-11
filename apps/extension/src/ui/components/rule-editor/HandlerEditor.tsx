@@ -4,12 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { Button } from '@/ui/components/ui/button';
 import { Field, Label } from '@/ui/components/ui/field';
-import {
-  FileLoader,
-  dropRing,
-  useFileDrop,
-  type LoadedFile,
-} from '@/ui/components/ui/file-loader';
+import { FileLoader, dropRing, useFileDrop, type LoadedFile } from '@/ui/components/ui/file-loader';
 import { HelpPopover } from '@/ui/components/ui/help-popover';
 import { CodeEditor } from '@/ui/components/ui/code-editor';
 import { Input, Textarea } from '@/ui/components/ui/input';
@@ -47,20 +42,31 @@ export function HandlerEditor({
 }: HandlerEditorProps) {
   const toast = useToast();
   const runner = useHandlerRunner();
+  // Destructured so the effect below can depend on the callback rather than on
+  // the whole runner, whose `outcome` changes on every run.
+  const { reset: resetRunner } = runner;
   const [method, setMethod] = useState('GET');
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(() => suggestUrl(rule));
   const [body, setBody] = useState('');
 
-  // The obvious thing to test against is the pattern the rule already matches.
-  useEffect(() => {
-    setUrl((current) => (current.length > 0 ? current : suggestUrl(rule)));
-  }, [rule]);
+  /*
+   * The obvious thing to test against is the pattern the rule already matches,
+   * so selecting a different rule re-suggests -- unless something has been
+   * typed, which is always worth more than a suggestion. Adjusted during render
+   * rather than in an effect: it is state derived from a prop, and an effect
+   * would show the previous rule's url for one frame.
+   */
+  const [suggestedFor, setSuggestedFor] = useState(rule.id);
+  if (suggestedFor !== rule.id) {
+    setSuggestedFor(rule.id);
+    if (url.length === 0) setUrl(suggestUrl(rule));
+  }
 
   // An edited handler has not been tested, and showing the old result beside
   // new code is the one thing a runner must never do.
   useEffect(() => {
-    runner.reset();
-  }, [code, runner.reset]);
+    resetRunner();
+  }, [code, resetRunner]);
 
   const loadFile = (file: LoadedFile) => {
     onChangeCode(file.text);
@@ -91,13 +97,14 @@ export function HandlerEditor({
               <p>
                 <b>res</b> — <code>status()</code>, <code>set()</code>, <code>delay()</code>,{' '}
                 <code>json()</code>, <code>text()</code>, <code>send()</code>,{' '}
-                <code>sendStatus()</code>, <code>stream(chunks, &#123;format, every, repeat&#125;)</code>,{' '}
-                <code>fail()</code>, <code>passthrough()</code>.
+                <code>sendStatus()</code>,{' '}
+                <code>stream(chunks, &#123;format, every, repeat&#125;)</code>, <code>fail()</code>,{' '}
+                <code>passthrough()</code>.
               </p>
               <p>
-                Returning a plain value sends it as json. Returning nothing —{' '}
-                or <code>next()</code> — hands the request to the rules below this one, which is
-                how a handler at the top of the list behaves like middleware.
+                Returning a plain value sends it as json. Returning nothing — or <code>next()</code>{' '}
+                — hands the request to the rules below this one, which is how a handler at the top
+                of the list behaves like middleware.
               </p>
               <p>
                 <b>params</b> comes from the url pattern: named groups in <code>regex</code> mode,{' '}
@@ -109,8 +116,8 @@ export function HandlerEditor({
                 page — a counter, a fake database, a token you just issued.
               </p>
               <p>
-                <code>await</code> is available. <code>console.log</code> goes to the console of
-                the page being mocked.
+                <code>await</code> is available. <code>console.log</code> goes to the console of the
+                page being mocked.
               </p>
             </HelpPopover>
           </div>

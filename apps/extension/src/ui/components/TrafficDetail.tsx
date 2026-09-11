@@ -195,9 +195,7 @@ export function TrafficDetail({ entry, rules, onClose, onMockRequest }: TrafficD
               <p className="rounded-xl bg-sunk p-2.5 font-mono text-[12px] leading-relaxed break-all text-ink shadow-ring">
                 {entry.url}
               </p>
-              <p className="text-[12.5px] leading-snug text-ink-muted">
-                {decidedBy(entry, rules)}
-              </p>
+              <p className="text-[12.5px] leading-snug text-ink-muted">{decidedBy(entry, rules)}</p>
             </Section>
 
             <Section

@@ -1,0 +1,39 @@
+# Packages the extension for a tag, and attaches the zip to the release.
+#
+# Loading an unpacked build is the developer path; this is the one for handing
+# someone a build without asking them to clone and run a package manager.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # A build that has not been checked is not worth releasing.
+      - run: pnpm check
+      - run: pnpm build
+
+      - name: Zip the unpacked extension
+        run: |
+          cd apps/extension/dist
+          zip -r "$GITHUB_WORKSPACE/decoy-${GITHUB_REF_NAME}.zip" .
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: decoy-*.zip
+          generate_release_notes: true

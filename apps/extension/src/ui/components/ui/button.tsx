@@ -13,8 +13,7 @@ const buttonVariants = cva(
         // colour, and in dark theme it renders a muddy olive that reads as
         // disabled. Ink on paper is unambiguous in both themes and leaves gold
         // to mean one thing. One primary per surface.
-        primary:
-          'bg-ink text-paper hover:bg-ink/86 disabled:bg-sunk disabled:text-ink-label',
+        primary: 'bg-ink text-paper hover:bg-ink/86 disabled:bg-sunk disabled:text-ink-label',
         secondary:
           'bg-surface text-ink shadow-edge hover:bg-sunk disabled:text-ink-label disabled:shadow-ring',
         ghost: 'text-ink-muted hover:bg-sunk hover:text-ink disabled:text-ink-label',

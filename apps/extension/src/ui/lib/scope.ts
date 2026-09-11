@@ -34,10 +34,7 @@ function hostOf(url: string | null): string | null {
   }
 }
 
-export function summarizeScope(
-  entries: readonly TrafficEntry[],
-  tabId: number | null,
-): PageScope {
+export function summarizeScope(entries: readonly TrafficEntry[], tabId: number | null): PageScope {
   if (tabId === null) return EMPTY_PAGE_SCOPE;
 
   let host: string | null = null;

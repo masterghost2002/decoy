@@ -61,7 +61,9 @@ export interface RequestFacts {
   body: string | null;
 }
 
-export function createRequestFacts(partial: Partial<RequestFacts> & { url: string; method: string }): RequestFacts {
+export function createRequestFacts(
+  partial: Partial<RequestFacts> & { url: string; method: string },
+): RequestFacts {
   return {
     headers: {},
     cookies: {},
@@ -116,15 +118,18 @@ function readJsonPath(body: string | null, path: string): string | null {
   }
 
   if (current === undefined || current === null) return null;
+  // Narrowed positively rather than by elimination: the walker's value is
+  // `unknown`, and nothing can be subtracted from `unknown`.
   if (typeof current === 'object') return JSON.stringify(current);
-  return String(current);
+  if (typeof current === 'string') return current;
+  if (typeof current === 'number' || typeof current === 'boolean') return String(current);
+  if (typeof current === 'bigint') return current.toString();
+  // Parsed json holds nothing else, so there is nothing left to describe.
+  return null;
 }
 
 /** `null` means "absent", which is what `exists` / `notExists` test for. */
-export function readConditionValue(
-  condition: RuleCondition,
-  facts: RequestFacts,
-): string | null {
+export function readConditionValue(condition: RuleCondition, facts: RequestFacts): string | null {
   switch (condition.source) {
     case 'header':
       return facts.headers[condition.key.trim().toLowerCase()] ?? null;

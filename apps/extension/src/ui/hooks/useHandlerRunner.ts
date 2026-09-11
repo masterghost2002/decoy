@@ -99,7 +99,9 @@ export function useHandlerRunner(): HandlerRunner {
         }
         const action = actionFromHandlerOutcome(result.outcome);
         setOutcome(
-          action === null ? { kind: 'declined' } : { kind: 'answered', plan: resolveAction(action) },
+          action === null
+            ? { kind: 'declined' }
+            : { kind: 'answered', plan: resolveAction(action) },
         );
       });
   }, []);

@@ -115,8 +115,8 @@ function FiredStamp({ hits, lastHitAt, now }: { hits: number; lastHitAt: number;
       )}
       aria-label={fresh ? `fired ${since}, ${String(hits)} times` : `fired ${String(hits)} times`}
     >
-      {fresh ? <span className="hidden @[25rem]:inline">· fired {since} </span> : null}·{' '}
-      {hits}&times;
+      {fresh ? <span className="hidden @[25rem]:inline">· fired {since} </span> : null}· {hits}
+      &times;
     </span>
   );
 }
@@ -152,9 +152,14 @@ export function RuleList({
     );
   }, [rules, query]);
 
-  // Only tick while a stamp is still young enough to change.
+  /*
+   * Only tick while a stamp is still young enough to change. Reading the clock
+   * during render is exactly what "is this recent?" means, and `useTicker` is
+   * the subscription that makes the answer update rather than go stale.
+   */
   const hasFreshHit = rules.some((rule) => {
     const stat = readRuleStat(stats, rule.id);
+    // eslint-disable-next-line react-hooks/purity
     return stat.hits > 0 && Date.now() - stat.lastHitAt < FRESH_HIT_MS;
   });
   const now = useTicker(hasFreshHit);

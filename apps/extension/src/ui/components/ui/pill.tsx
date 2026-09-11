@@ -1,4 +1,4 @@
-import { METHOD_ANY, type MethodPattern, type TrafficOutcome } from '@mocksmith/core';
+import { METHOD_ANY, type TrafficOutcome } from '@mocksmith/core';
 import type { ComponentProps } from 'react';
 
 import { cn } from '@/ui/lib/utils';
@@ -31,7 +31,7 @@ const METHOD_TONE: Record<string, string> = {
   OPTIONS: 'border-hairline-strong text-ink-muted',
 };
 
-export function MethodPill({ method }: { method: MethodPattern | string }) {
+export function MethodPill({ method }: { method: string }) {
   if (method === METHOD_ANY) {
     return <Pill className="border-hairline-strong text-ink-muted">any</Pill>;
   }

@@ -11,7 +11,6 @@ import {
   type ConditionMode,
   type MockRule,
   type NetworkErrorType,
-  type ResponseBody,
   type ResponseBodyType,
   type RuleAction,
   type RuleActionKind,
@@ -384,9 +383,7 @@ export function RuleEditor({
           </p>
         </div>
 
-        {showMatchTester ? (
-          <UrlMatchTester rule={draft} rules={rules} />
-        ) : null}
+        {showMatchTester ? <UrlMatchTester rule={draft} rules={rules} /> : null}
 
         <ConditionsEditor
           conditions={draft.matcher.conditions}
@@ -479,7 +476,6 @@ export function RuleEditor({
           </div>
         ) : null}
       </div>
-
     </form>
   );
 }
@@ -594,11 +590,7 @@ function HandlerFields({ rule, action, onPatch, onChangeDelay }: HandlerFieldsPr
           onPatch({ timeoutMs });
         }}
       />
-      <DelayField
-        label="Delay (ms)"
-        value={action.delayMs}
-        onChange={onChangeDelay}
-      />
+      <DelayField label="Delay (ms)" value={action.delayMs} onChange={onChangeDelay} />
     </>
   );
 }

@@ -77,7 +77,7 @@ function toBodyText(value: unknown): string {
 
 export function createResponder(): ResponderHandle {
   let status = 200;
-  let statusText = '';
+  const statusText = '';
   let delayMs = 0;
   const headers: ResponseHeader[] = [];
 
@@ -159,7 +159,15 @@ export function createResponder(): ResponderHandle {
       // Returned a plain value: that is the json body, and any status or header
       // set beforehand still applies.
       if (returned !== undefined && returned !== null) {
-        return { kind: 'respond', status, statusText, headers: [...headers], body: toBodyText(returned), bodyType: isPlainText(returned) ? 'text' : 'json', delayMs };
+        return {
+          kind: 'respond',
+          status,
+          statusText,
+          headers: [...headers],
+          body: toBodyText(returned),
+          bodyType: isPlainText(returned) ? 'text' : 'json',
+          delayMs,
+        };
       }
 
       // Returned nothing, but sent something on the way through.

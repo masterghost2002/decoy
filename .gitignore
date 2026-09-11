@@ -5,3 +5,7 @@ dist/
 .vite/
 coverage/
 *.tsbuildinfo
+
+# Browser binaries the e2e job caches, and the screenshots it writes.
+.playwright/
+shots/

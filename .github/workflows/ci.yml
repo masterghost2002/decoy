@@ -1,0 +1,116 @@
+# Every gate this project has, on every push and pull request.
+#
+# Split into jobs rather than one long script so a red run names what broke in
+# the job list, without anyone opening a log. The static checks run in parallel
+# and take seconds; the browser run is the slow one and is the only job that
+# needs a build, so it is the only one that produces artefacts.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A second push to the same branch makes the first run's answer irrelevant.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Playwright downloads a Chrome for Testing here; the e2e job caches it.
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright
+
+jobs:
+  static:
+    name: ${{ matrix.check.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - { name: format, run: pnpm format:check }
+          - { name: lint, run: pnpm lint }
+          - { name: typecheck, run: pnpm typecheck }
+          - { name: unit tests, run: pnpm test }
+          # The palette's contrast floors. It runs as part of `build` too, but
+          # having it on its own says *what* failed when it does.
+          - { name: contrast, run: pnpm contrast }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: ${{ matrix.check.run }}
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # The thing you actually load into Chrome, downloadable from the run.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: decoy-extension
+          path: apps/extension/dist
+          if-no-files-found: error
+          retention-days: 14
+
+  e2e:
+    name: playground (e2e)
+    runs-on: ubuntu-latest
+    # 198 playground cases plus the UI and floating-panel checks. The whole run
+    # is well under a minute; the ceiling is here to catch a hang, not a slow day.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Chrome 137+ ignores --load-extension on the stable channel, so the run
+      # needs a Chrome for Testing build rather than whatever the image ships.
+      - name: Cache Chrome for Testing
+        id: chrome-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chrome for Testing
+        if: steps.chrome-cache.outputs.cache-hit != 'true'
+        run: npx --yes playwright@latest install --with-deps chromium
+
+      - run: pnpm build
+      # Xvfb, because the extension is loaded into a real browser and headless
+      # Chrome still wants a display for some of the panel work.
+      - name: Run the playground headless
+        run: xvfb-run --auto-servernum pnpm e2e
+
+      # Screenshots of every surface in both themes. Worth keeping even on a
+      # green run: this is how a visual regression gets noticed at all.
+      - name: Capture the UI surfaces
+        if: always()
+        env:
+          E2E_SCREENSHOT_DIR: ${{ github.workspace }}/shots
+        run: xvfb-run --auto-servernum pnpm e2e
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-screenshots
+          path: shots
+          if-no-files-found: ignore
+          retention-days: 14

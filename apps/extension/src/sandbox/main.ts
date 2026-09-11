@@ -119,9 +119,7 @@ async function handle(call: HandlerCallMessage): Promise<void> {
   let outcome: HandlerOutcome;
   try {
     const returned: unknown = await withTimeout(
-      Promise.resolve(
-        run(call.request, handle.res, handle.next, store, createLogger(call.id)),
-      ),
+      Promise.resolve(run(call.request, handle.res, handle.next, store, createLogger(call.id))),
       call.timeoutMs,
     );
     outcome = handle.resolve(returned);

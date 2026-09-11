@@ -54,11 +54,7 @@ export function setRuleEnabled(
 }
 
 /** Moves a rule by `offset` positions, clamped to the ends of the list. */
-export function moveRule(
-  config: DecoyConfig,
-  ruleId: string,
-  offset: number,
-): DecoyConfig {
+export function moveRule(config: DecoyConfig, ruleId: string, offset: number): DecoyConfig {
   const index = config.rules.findIndex((rule) => rule.id === ruleId);
   if (index === -1) return config;
 
@@ -77,11 +73,7 @@ export function moveRule(
  * and what "move above 02" and an undone deletion both need: a target index
  * rather than an offset.
  */
-export function moveRuleToIndex(
-  config: DecoyConfig,
-  ruleId: string,
-  index: number,
-): DecoyConfig {
+export function moveRuleToIndex(config: DecoyConfig, ruleId: string, index: number): DecoyConfig {
   const current = config.rules.findIndex((rule) => rule.id === ruleId);
   if (current === -1) return config;
   const target = Math.min(Math.max(index, 0), config.rules.length - 1);

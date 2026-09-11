@@ -2,22 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "types": [
-      "chrome",
-      "node",
-      "vite/client"
-    ],
+    "types": ["chrome", "node", "vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     }
   },
-  "include": [
-    "src",
-    "scripts",
-    "vite.config.ts",
-    "vitest.config.ts"
-  ]
+  "include": ["src", "scripts", "vite.config.ts", "vitest.config.ts"]
 }

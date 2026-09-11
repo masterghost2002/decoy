@@ -117,6 +117,7 @@ export function createHandlerClient(): HandlerClient {
       const name = pending.get(message.id)?.ruleName ?? 'handler';
       // The page's console, not the frame's: that is where the person
       // debugging their own page is already looking.
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- called immediately below
       const write = console[message.level] as ((...args: unknown[]) => void) | undefined;
       (write ?? console.log)(`[decoy ${name}]`, message.text);
     }

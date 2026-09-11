@@ -172,7 +172,12 @@ describe('resolveAction for stream', () => {
 
   it('drops chunks that would put nothing on the wire', () => {
     const plan = asStream(
-      stream({ chunks: [{ id: 'c1', value: '  ' }, { id: 'c2', value: 'x' }] }),
+      stream({
+        chunks: [
+          { id: 'c1', value: '  ' },
+          { id: 'c2', value: 'x' },
+        ],
+      }),
     );
     expect(plan.chunks).toEqual(['data: x\n\n']);
   });

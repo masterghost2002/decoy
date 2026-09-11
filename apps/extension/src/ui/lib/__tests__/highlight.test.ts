@@ -105,7 +105,7 @@ describe('tokenizeJs', () => {
   it('loses nothing on the starter handler', () => {
     const source = [
       "if (req.method === 'POST') {",
-      '  const sent = JSON.parse(req.body ?? \'{}\');',
+      "  const sent = JSON.parse(req.body ?? '{}');",
       "  return res.status(201).json({ id: 'u_1', ...sent });",
       '}',
       'store.hits = (store.hits ?? 0) + 1;',

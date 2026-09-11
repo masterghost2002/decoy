@@ -1,12 +1,4 @@
-export const HTTP_METHODS = [
-  'GET',
-  'POST',
-  'PUT',
-  'PATCH',
-  'DELETE',
-  'HEAD',
-  'OPTIONS',
-] as const;
+export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
@@ -85,7 +77,6 @@ export const HTTP_STATUSES: readonly HttpStatus[] = Object.keys(STATUS_TEXT)
   .filter((status) => status >= 200)
   .sort((a, b) => a - b)
   .map((status) => ({ status, text: STATUS_TEXT[status] ?? '' }));
-
 
 export function defaultStatusText(status: number): string {
   return STATUS_TEXT[status] ?? '';

@@ -9,9 +9,7 @@ export type ResponseBodyType = (typeof RESPONSE_BODY_TYPES)[number];
  * stays malformed, which is itself a case front-end code needs to handle.
  */
 export type ResponseBody =
-  | { type: 'json'; value: string }
-  | { type: 'text'; value: string }
-  | { type: 'empty' };
+  { type: 'json'; value: string } | { type: 'text'; value: string } | { type: 'empty' };
 
 export interface ResponseHeader {
   name: string;
@@ -118,11 +116,7 @@ export interface PassthroughAction {
 }
 
 export type RuleAction =
-  | RespondAction
-  | StreamAction
-  | HandlerAction
-  | NetworkErrorAction
-  | PassthroughAction;
+  RespondAction | StreamAction | HandlerAction | NetworkErrorAction | PassthroughAction;
 export type RuleActionKind = RuleAction['kind'];
 
 /**

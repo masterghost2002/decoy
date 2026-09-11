@@ -1,23 +1,16 @@
-import { ChevronsLeft } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import { ChevronsLeft } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 
-import { App } from "@/ui/App";
-import { ErrorBoundary } from "@/ui/components/ui/error-boundary";
-import { ToastProvider } from "@/ui/components/ui/toast";
-import { TooltipProvider } from "@/ui/components/ui/tooltip";
-import { announcePanel } from "@/ui/lib/messaging";
-import { getPortalContainer } from "@/ui/lib/roots";
-import { cn } from "@/ui/lib/utils";
+import { App } from '@/ui/App';
+import { ErrorBoundary } from '@/ui/components/ui/error-boundary';
+import { ToastProvider } from '@/ui/components/ui/toast';
+import { TooltipProvider } from '@/ui/components/ui/tooltip';
+import { getPortalContainer } from '@/ui/lib/roots';
+import { cn } from '@/ui/lib/utils';
 
-import { clampFrame, saveFrame, type PanelFrame } from "./frame";
+import { clampFrame, saveFrame, type PanelFrame } from './frame';
 
 /**
  * The button left behind when the panel is folded away.
@@ -41,15 +34,15 @@ function CollapsedLauncher({ onExpand }: { onExpand: () => void }) {
       aria-label="Expand the Decoy panel"
       title="Expand Decoy"
       className={cn(
-        "fixed top-1/2 right-0 z-[2147483646] flex -translate-y-1/2 items-center gap-1.5",
-        "rounded-l-full border border-r-0 border-hairline bg-surface py-2.5 pr-2 pl-3",
-        "text-ink shadow-pop transition-[padding,background-color] duration-[120ms]",
-        "hover:bg-sunk hover:pr-3",
+        'fixed top-1/2 right-0 z-[2147483646] flex -translate-y-1/2 items-center gap-1.5',
+        'rounded-l-full border border-r-0 border-hairline bg-surface py-2.5 pr-2 pl-3',
+        'text-ink shadow-pop transition-[padding,background-color] duration-[120ms]',
+        'hover:bg-sunk hover:pr-3',
       )}
     >
       <ChevronsLeft aria-hidden className="size-4 text-ink-muted" />
       <img
-        src={chrome.runtime.getURL("icons/icon-32.png")}
+        src={chrome.runtime.getURL('icons/icon-32.png')}
         alt=""
         aria-hidden
         draggable={false}
@@ -67,76 +60,76 @@ function CollapsedLauncher({ onExpand }: { onExpand: () => void }) {
  */
 const GRIPS = [
   {
-    at: "n",
-    cursor: "ns-resize",
+    at: 'n',
+    cursor: 'ns-resize',
     dx: 0,
     dy: 1,
     dw: 0,
     dh: -1,
-    class: "top-0 inset-x-3 h-1.5",
+    class: 'top-0 inset-x-3 h-1.5',
   },
   {
-    at: "s",
-    cursor: "ns-resize",
+    at: 's',
+    cursor: 'ns-resize',
     dx: 0,
     dy: 0,
     dw: 0,
     dh: 1,
-    class: "bottom-0 inset-x-3 h-1.5",
+    class: 'bottom-0 inset-x-3 h-1.5',
   },
   {
-    at: "w",
-    cursor: "ew-resize",
+    at: 'w',
+    cursor: 'ew-resize',
     dx: 1,
     dy: 0,
     dw: -1,
     dh: 0,
-    class: "left-0 inset-y-3 w-1.5",
+    class: 'left-0 inset-y-3 w-1.5',
   },
   {
-    at: "e",
-    cursor: "ew-resize",
+    at: 'e',
+    cursor: 'ew-resize',
     dx: 0,
     dy: 0,
     dw: 1,
     dh: 0,
-    class: "right-0 inset-y-3 w-1.5",
+    class: 'right-0 inset-y-3 w-1.5',
   },
   {
-    at: "nw",
-    cursor: "nwse-resize",
+    at: 'nw',
+    cursor: 'nwse-resize',
     dx: 1,
     dy: 1,
     dw: -1,
     dh: -1,
-    class: "top-0 left-0 size-3.5",
+    class: 'top-0 left-0 size-3.5',
   },
   {
-    at: "ne",
-    cursor: "nesw-resize",
+    at: 'ne',
+    cursor: 'nesw-resize',
     dx: 0,
     dy: 1,
     dw: 1,
     dh: -1,
-    class: "top-0 right-0 size-3.5",
+    class: 'top-0 right-0 size-3.5',
   },
   {
-    at: "sw",
-    cursor: "nesw-resize",
+    at: 'sw',
+    cursor: 'nesw-resize',
     dx: 1,
     dy: 0,
     dw: -1,
     dh: 1,
-    class: "bottom-0 left-0 size-3.5",
+    class: 'bottom-0 left-0 size-3.5',
   },
   {
-    at: "se",
-    cursor: "nwse-resize",
+    at: 'se',
+    cursor: 'nwse-resize',
     dx: 0,
     dy: 0,
     dw: 1,
     dh: 1,
-    class: "right-0 bottom-0 size-3.5",
+    class: 'right-0 bottom-0 size-3.5',
   },
 ] as const;
 
@@ -163,11 +156,7 @@ export interface FloatingPanelProps {
  * stream of pointer events that would otherwise re-render the entire rule
  * editor on every frame.
  */
-export function FloatingPanel({
-  frameEl,
-  initialFrame,
-  onClose,
-}: FloatingPanelProps) {
+export function FloatingPanel({ frameEl, initialFrame, onClose }: FloatingPanelProps) {
   const [frame, setFrame] = useState(initialFrame);
   /**
    * Folded away, but not gone. Collapsing is the answer to "I need to see the
@@ -180,6 +169,13 @@ export function FloatingPanel({
   /** The live value during a gesture, so a move never reads a stale render. */
   const latest = useRef(frame);
 
+  /*
+   * `frameEl` is the host element the panel was mounted into, not a React-owned
+   * value: writing to its style is the only way to move a panel without
+   * re-rendering the tree on every pointer move, which is the entire reason
+   * dragging feels the way it does.
+   */
+  /* eslint-disable react-hooks/immutability */
   const apply = useCallback(
     (next: PanelFrame) => {
       const clamped = clampFrame(next);
@@ -202,17 +198,18 @@ export function FloatingPanel({
    * collapsing has to be free, or nobody will use it to peek at the page.
    */
   useLayoutEffect(() => {
-    frameEl.style.display = collapsed ? "none" : "flex";
+    frameEl.style.display = collapsed ? 'none' : 'flex';
   }, [collapsed, frameEl]);
+  /* eslint-enable react-hooks/immutability */
 
   // A window that shrinks below the panel can strand it off the edge.
   useEffect(() => {
     const onResize = () => {
       setFrame((current) => clampFrame(current));
     };
-    window.addEventListener("resize", onResize);
+    window.addEventListener('resize', onResize);
     return () => {
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener('resize', onResize);
     };
   }, []);
 
@@ -230,14 +227,12 @@ export function FloatingPanel({
       const originY = event.clientY;
 
       const onMove = (moveEvent: PointerEvent) => {
-        apply(
-          move(moveEvent.clientX - originX, moveEvent.clientY - originY, start),
-        );
+        apply(move(moveEvent.clientX - originX, moveEvent.clientY - originY, start));
       };
       const onUp = () => {
-        window.removeEventListener("pointermove", onMove, true);
-        window.removeEventListener("pointerup", onUp, true);
-        window.removeEventListener("pointercancel", onUp, true);
+        window.removeEventListener('pointermove', onMove, true);
+        window.removeEventListener('pointerup', onUp, true);
+        window.removeEventListener('pointercancel', onUp, true);
         // One state write at the end of the gesture, not sixty during it.
         setFrame(latest.current);
         saveFrame(latest.current);
@@ -245,9 +240,9 @@ export function FloatingPanel({
 
       // Captured, because a page is entitled to stop propagation on its own
       // events and a half-finished drag that never ends is unrecoverable.
-      window.addEventListener("pointermove", onMove, true);
-      window.addEventListener("pointerup", onUp, true);
-      window.addEventListener("pointercancel", onUp, true);
+      window.addEventListener('pointermove', onMove, true);
+      window.addEventListener('pointerup', onUp, true);
+      window.addEventListener('pointercancel', onUp, true);
     },
     [apply],
   );
@@ -310,7 +305,7 @@ export function FloatingPanel({
           // Inside the bounds rather than straddling them: the frame clips its
           // own corners to stay round, and a grip hanging over the edge would
           // be clipped away with them.
-          className={cn("absolute z-50 touch-none", grip.class)}
+          className={cn('absolute z-50 touch-none', grip.class)}
         />
       ))}
     </>

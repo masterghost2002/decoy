@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  MAX_CHUNKS_FROM_TEXT,
-  MAX_CHUNK_SOURCE_CHARS,
-  chunksFromText,
-} from '../factory.js';
+import { MAX_CHUNKS_FROM_TEXT, MAX_CHUNK_SOURCE_CHARS, chunksFromText } from '../factory.js';
 import { encodeStreamChunk } from '../resolve.js';
 import type { StreamFormat } from '../rule.js';
 

@@ -1,20 +1,15 @@
 import { checkJson, formatJson, type ResponseBody, type ResponseBodyType } from '@mocksmith/core';
 import { ChevronDown, ChevronUp, Maximize2, Search, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { FieldsEditor } from '@/ui/components/rule-editor/FieldsEditor';
 import { Button } from '@/ui/components/ui/button';
 import { Chip, ChipGroup } from '@/ui/components/ui/chip';
 import { Dialog, FullscreenDialogContent } from '@/ui/components/ui/dialog';
 import { Label } from '@/ui/components/ui/field';
-import {
-  FileLoader,
-  dropRing,
-  useFileDrop,
-  type LoadedFile,
-} from '@/ui/components/ui/file-loader';
+import { FileLoader, dropRing, useFileDrop, type LoadedFile } from '@/ui/components/ui/file-loader';
 import { CodeEditor } from '@/ui/components/ui/code-editor';
-import { Input, Select, Textarea } from '@/ui/components/ui/input';
+import { Input, Select } from '@/ui/components/ui/input';
 import { useToast } from '@/ui/components/ui/toast';
 import { cn } from '@/ui/lib/utils';
 
@@ -74,7 +69,7 @@ function BodySearch({
   value: string;
 }) {
   const [query, setQuery] = useState('');
-  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [caseSensitive] = useState(false);
   /** -1 means "nothing stepped to yet", so the first step lands on match one. */
   const [index, setIndex] = useState(-1);
 
@@ -83,10 +78,17 @@ function BodySearch({
     [value, query, caseSensitive],
   );
 
-  // A changed query means the old position is meaningless.
-  useEffect(() => {
+  /*
+   * A changed query means the old position is meaningless. Adjusted during
+   * render rather than in an effect, which is what React recommends for state
+   * derived from other state: an effect would render once with a stale index
+   * and then immediately again with the right one.
+   */
+  const [searchedFor, setSearchedFor] = useState({ query, caseSensitive });
+  if (searchedFor.query !== query || searchedFor.caseSensitive !== caseSensitive) {
+    setSearchedFor({ query, caseSensitive });
     setIndex(-1);
-  }, [query, caseSensitive]);
+  }
 
   const step = useCallback(
     (direction: 1 | -1) => {
@@ -288,8 +290,8 @@ export function BodyEditor({
             dropRing(drop.over),
           )}
         >
-          No body is sent, and no Content-Type is set. Drop a file here, or load one, to answer
-          with its contents instead.
+          No body is sent, and no Content-Type is set. Drop a file here, or load one, to answer with
+          its contents instead.
         </p>
       </div>
     );

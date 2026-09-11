@@ -12,12 +12,7 @@ import { useMemo, type ReactNode } from 'react';
 
 import { Button } from '@/ui/components/ui/button';
 import { Field, Label } from '@/ui/components/ui/field';
-import {
-  FileLoader,
-  dropRing,
-  useFileDrop,
-  type LoadedFile,
-} from '@/ui/components/ui/file-loader';
+import { FileLoader, dropRing, useFileDrop, type LoadedFile } from '@/ui/components/ui/file-loader';
 import { Input, Textarea } from '@/ui/components/ui/input';
 import { Listbox, type ListboxOption } from '@/ui/components/ui/listbox';
 import { useToast } from '@/ui/components/ui/toast';
@@ -104,7 +99,10 @@ export function StreamEditor({
     const notes: string[] = [];
     if (detected !== null && detected !== previousFormat) notes.push(`as ${detected}`);
     if (result.truncated) notes.push('cut at 256KB');
-    if (result.omitted > 0) notes.push(`${String(result.omitted)} past the first ${String(MAX_CHUNKS_FROM_TEXT)} left out`);
+    if (result.omitted > 0)
+      notes.push(
+        `${String(result.omitted)} past the first ${String(MAX_CHUNKS_FROM_TEXT)} left out`,
+      );
 
     toast.show(
       `${String(result.chunks.length)} ${result.chunks.length === 1 ? 'chunk' : 'chunks'} from ${file.name}${notes.length === 0 ? '' : ` (${notes.join(', ')})`}`,
@@ -236,7 +234,10 @@ export function StreamEditor({
             record: an sse event, an ndjson line, a line of text.
           </p>
         ) : (
-          <ul {...drop.handlers} className={cn('flex flex-col gap-1.5 rounded-xl', dropRing(drop.over))}>
+          <ul
+            {...drop.handlers}
+            className={cn('flex flex-col gap-1.5 rounded-xl', dropRing(drop.over))}
+          >
             {chunks.map((chunk, index) => {
               const wire = encodeStreamChunk(format, chunk.value);
               return (

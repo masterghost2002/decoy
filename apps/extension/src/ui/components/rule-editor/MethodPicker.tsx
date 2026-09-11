@@ -1,7 +1,13 @@
 import { HTTP_METHODS, METHOD_ANY, type MethodPattern } from '@mocksmith/core';
 import { ChevronDown } from 'lucide-react';
 
-import { Menu, MenuCheckboxItem, MenuContent, MenuSeparator, MenuTrigger } from '@/ui/components/ui/menu';
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuContent,
+  MenuSeparator,
+  MenuTrigger,
+} from '@/ui/components/ui/menu';
 import { cn } from '@/ui/lib/utils';
 
 export interface MethodPickerProps {
@@ -46,7 +52,7 @@ export function MethodPicker({ value, onChange, className }: MethodPickerProps) 
       : selected.filter((item) => item !== method);
 
     // Matching nothing is never what someone means, so fall back to "any".
-    onChange(next.length === 0 ? [METHOD_ANY] : (next as MethodPattern[]));
+    onChange(next.length === 0 ? [METHOD_ANY] : next);
   };
 
   return (

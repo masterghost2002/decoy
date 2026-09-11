@@ -71,7 +71,7 @@ export function compileRegExp(source: string, flags: string): RegExp | null {
   const cached = regexCache.get(key);
   if (cached !== undefined) return cached;
 
-  let compiled: RegExp | null = null;
+  let compiled: RegExp | null;
   try {
     compiled = new RegExp(source, flags);
   } catch {
@@ -131,10 +131,7 @@ export function matchesUrl(matcher: UrlMatcher, url: string): boolean {
   const candidates = urlMatchCandidates(url, pattern);
 
   if (matcher.mode === 'wildcard') {
-    const regex = compileRegExp(
-      wildcardToRegExpSource(pattern),
-      matcher.caseSensitive ? '' : 'i',
-    );
+    const regex = compileRegExp(wildcardToRegExpSource(pattern), matcher.caseSensitive ? '' : 'i');
     if (regex === null) return false;
     return candidates.some((candidate) => regex.test(candidate));
   }
@@ -221,10 +218,7 @@ function factsFor(request: InterceptedRequest): RequestFacts {
   };
 }
 
-export function matchesRequest(
-  matcher: RequestMatcher,
-  request: InterceptedRequest,
-): boolean {
+export function matchesRequest(matcher: RequestMatcher, request: InterceptedRequest): boolean {
   if (!matchesMethod(matcher.methods, request.method)) return false;
   if (!matchesUrl(matcher.url, request.url)) return false;
   // Cheapest tests first: conditions can parse json, so they run last.

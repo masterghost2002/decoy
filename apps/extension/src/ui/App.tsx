@@ -13,7 +13,14 @@ import {
   PanelRightOpen,
   TriangleAlert,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 
 import { FirstRun } from '@/ui/components/FirstRun';
 import { Header } from '@/ui/components/Header';
@@ -103,13 +110,7 @@ export function App({ view, panelChrome }: { view: ViewKind; panelChrome?: Panel
   }
 
   return (
-    <Surface
-      view={view}
-      config={config}
-      error={error}
-      update={update}
-      panelChrome={panelChrome}
-    />
+    <Surface view={view} config={config} error={error} update={update} panelChrome={panelChrome} />
   );
 }
 

@@ -91,7 +91,9 @@ export function useScopeTabId(view: 'popup' | 'tab' | 'panel'): number | null {
 
     const resolve =
       view === 'popup'
-        ? chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => tabs[0]?.id ?? null)
+        ? chrome.tabs
+            .query({ active: true, currentWindow: true })
+            .then((tabs) => tabs[0]?.id ?? null)
         : fetchOwnTabId();
 
     void resolve

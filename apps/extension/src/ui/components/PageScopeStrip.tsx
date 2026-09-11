@@ -38,7 +38,9 @@ export function PageScopeStrip({
         // A single fixed height is the whole point: this strip is the one thing
         // between the header and the tabs, and it must not resize.
         'flex h-9 shrink-0 items-center gap-2 border-b px-3.5 font-mono text-[12px]',
-        enabled ? 'border-gold/30 bg-wash text-ink-muted' : 'border-hairline bg-sunk text-ink-muted',
+        enabled
+          ? 'border-gold/30 bg-wash text-ink-muted'
+          : 'border-hairline bg-sunk text-ink-muted',
       )}
     >
       {enabled ? (

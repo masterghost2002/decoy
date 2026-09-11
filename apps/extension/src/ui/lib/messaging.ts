@@ -11,7 +11,9 @@ class WorkerError extends Error {}
 async function send(message: ExtensionMessage): Promise<ExtensionResponse> {
   let response: ExtensionResponse | undefined;
   try {
-    response = (await chrome.runtime.sendMessage(message)) as ExtensionResponse | undefined;
+    response = await chrome.runtime.sendMessage<ExtensionMessage, ExtensionResponse | undefined>(
+      message,
+    );
   } catch (error) {
     throw new WorkerError(
       error instanceof Error ? error.message : 'Could not reach the Decoy background worker.',

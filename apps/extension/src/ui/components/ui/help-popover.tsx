@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 import { getPortalContainer, originalTarget } from '@/ui/lib/roots';
@@ -82,6 +90,9 @@ export function HelpPopover({
 
   useLayoutEffect(() => {
     if (!open) {
+      // Not derived state: the placement was measured off the DOM, and a closed
+      // popover has nothing to measure. Clearing it here is the teardown.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlacement(null);
       return;
     }

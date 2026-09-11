@@ -1,72 +1,100 @@
 import { HTTP_METHODS, METHOD_ANY, type MethodPattern } from '@mocksmith/core';
+import { ChevronDown } from 'lucide-react';
 
+import { Menu, MenuCheckboxItem, MenuContent, MenuSeparator, MenuTrigger } from '@/ui/components/ui/menu';
 import { cn } from '@/ui/lib/utils';
-
-const OPTIONS: MethodPattern[] = [METHOD_ANY, ...HTTP_METHODS];
-
-/** Same colour language as the method pills in the lists, so the two read alike. */
-const SELECTED_TONE: Record<string, string> = {
-  '*': 'border-gold/50 bg-wash text-warn',
-  GET: 'border-ok/45 bg-ok/10 text-ok',
-  POST: 'border-info/45 bg-info/10 text-info',
-  PUT: 'border-warn/50 bg-warn/10 text-warn',
-  PATCH: 'border-warn/50 bg-warn/10 text-warn',
-  DELETE: 'border-danger/45 bg-danger/10 text-danger',
-  HEAD: 'border-hairline-strong bg-sunk text-ink',
-  OPTIONS: 'border-hairline-strong bg-sunk text-ink',
-};
 
 export interface MethodPickerProps {
   value: MethodPattern[];
   onChange: (next: MethodPattern[]) => void;
+  className?: string;
+}
+
+/** "any", "GET", "GET POST", then a count -- the trigger is 6rem wide. */
+function summarize(value: MethodPattern[], isAny: boolean): string {
+  if (isAny) return 'any';
+  if (value.length <= 2) return value.join(' ');
+  return `${value[0] ?? ''} +${String(value.length - 1)}`;
 }
 
 /**
- * Toggle chips rather than a multi-select: picking "GET and POST" is one of the
- * most common edits here, and a chip row makes the current answer readable at a
- * glance.
+ * Which methods a rule answers, as a dropdown beside the url rather than a row
+ * of eight chips under it.
+ *
+ * The chips were honest -- every option visible, one click to change -- but they
+ * cost a full line of the form to say "any" nine times out of ten, directly
+ * above the field that actually decides whether the rule fires. The method is
+ * part of the request line, so it now sits in it: `GET  contains  /api/users`
+ * reads as one sentence, and the eight-way choice is one click away for the
+ * tenth case.
+ *
+ * Checkboxes rather than a select, because picking "GET and POST" is a normal
+ * edit here and a multi-select listbox cannot express it without modifier keys.
  */
-export function MethodPicker({ value, onChange }: MethodPickerProps) {
+export function MethodPicker({ value, onChange, className }: MethodPickerProps) {
   const isAny = value.includes(METHOD_ANY) || value.length === 0;
+  const selected = isAny ? [] : value;
 
-  const toggle = (method: MethodPattern) => {
+  const toggle = (method: MethodPattern, checked: boolean) => {
     if (method === METHOD_ANY) {
       onChange([METHOD_ANY]);
       return;
     }
 
-    const withoutAny = value.filter((item) => item !== METHOD_ANY);
-    const next = withoutAny.includes(method)
-      ? withoutAny.filter((item) => item !== method)
-      : [...withoutAny, method];
+    const next = checked
+      ? [...selected, method].filter((item, index, all) => all.indexOf(item) === index)
+      : selected.filter((item) => item !== method);
 
     // Matching nothing is never what someone means, so fall back to "any".
-    onChange(next.length === 0 ? [METHOD_ANY] : next);
+    onChange(next.length === 0 ? [METHOD_ANY] : (next as MethodPattern[]));
   };
 
   return (
-    <div className="flex flex-wrap gap-1" role="group" aria-label="Request methods">
-      {OPTIONS.map((method) => {
-        const selected = method === METHOD_ANY ? isAny : !isAny && value.includes(method);
-        return (
-          <button
+    <Menu>
+      <MenuTrigger
+        aria-label={`Request methods: ${isAny ? 'any' : selected.join(', ')}`}
+        className={cn(
+          'flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-sunk px-3 font-mono text-[13px] text-ink shadow-edge transition-shadow duration-[120ms]',
+          'hover:bg-sunk/70 data-[state=open]:bg-sunk/70',
+          className,
+        )}
+      >
+        <span className="min-w-0 truncate">{summarize(selected, isAny)}</span>
+        <ChevronDown aria-hidden className="ml-auto size-3.5 shrink-0 text-ink-label" />
+      </MenuTrigger>
+
+      <MenuContent align="start" className="min-w-[11rem]">
+        <MenuCheckboxItem
+          checked={isAny}
+          onCheckedChange={() => {
+            toggle(METHOD_ANY, true);
+          }}
+          // Kept open, because ticking three methods should not cost three trips.
+          onSelect={(event) => {
+            event.preventDefault();
+          }}
+        >
+          <span className="font-mono text-[13px]">any</span>
+          <span className="ml-auto text-[12px] text-ink-label">every method</span>
+        </MenuCheckboxItem>
+
+        <MenuSeparator />
+
+        {HTTP_METHODS.map((method) => (
+          <MenuCheckboxItem
             key={method}
-            type="button"
-            aria-pressed={selected}
-            onClick={() => {
-              toggle(method);
+            checked={selected.includes(method)}
+            onCheckedChange={(checked) => {
+              toggle(method, checked);
             }}
-            className={cn(
-              'rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.06em] transition-colors',
-              selected
-                ? SELECTED_TONE[method]
-                : 'border-hairline text-ink-faint hover:border-hairline-strong hover:text-ink-muted',
-            )}
+            onSelect={(event) => {
+              event.preventDefault();
+            }}
           >
-            {method === METHOD_ANY ? 'any' : method}
-          </button>
-        );
-      })}
-    </div>
+            <span className="font-mono text-[13px]">{method}</span>
+          </MenuCheckboxItem>
+        ))}
+      </MenuContent>
+    </Menu>
   );
 }

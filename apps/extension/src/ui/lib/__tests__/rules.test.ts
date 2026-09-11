@@ -1,10 +1,13 @@
 import { createRule, type MockRule, type MocksmithConfig, type TrafficEntry } from '@mocksmith/core';
+import { parseRule } from '@mocksmith/core/schema';
 import { describe, expect, it } from 'vitest';
 
 import {
   countEnabledRules,
   duplicateRule,
   moveRule,
+  moveRuleToIndex,
+  moveRuleToTop,
   removeRule,
   ruleFromTrafficEntry,
   setMasterEnabled,
@@ -62,6 +65,41 @@ describe('moveRule', () => {
   it('ignores an unknown id', () => {
     const start = config([rule('a')]);
     expect(moveRule(start, 'nope', 1)).toBe(start);
+  });
+});
+
+describe('moveRuleToIndex', () => {
+  it('moves a rule to an absolute position', () => {
+    const start = config([rule('a'), rule('b'), rule('c'), rule('d')]);
+    expect(ids(moveRuleToIndex(start, 'd', 1))).toEqual(['a', 'd', 'b', 'c']);
+    expect(ids(moveRuleToIndex(start, 'a', 2))).toEqual(['b', 'c', 'a', 'd']);
+  });
+
+  it('is a no-op when the rule is already there', () => {
+    const start = config([rule('a'), rule('b')]);
+    expect(ids(moveRuleToIndex(start, 'b', 1))).toEqual(['a', 'b']);
+  });
+
+  it('clamps an out-of-range target rather than dropping the rule', () => {
+    const start = config([rule('a'), rule('b'), rule('c')]);
+    expect(ids(moveRuleToIndex(start, 'a', 99))).toEqual(['b', 'c', 'a']);
+    expect(ids(moveRuleToIndex(start, 'c', -5))).toEqual(['c', 'a', 'b']);
+  });
+
+  it('ignores an unknown rule id', () => {
+    const start = config([rule('a'), rule('b')]);
+    expect(ids(moveRuleToIndex(start, 'nope', 0))).toEqual(['a', 'b']);
+  });
+
+  it('agrees with moveRuleToTop', () => {
+    const start = config([rule('a'), rule('b'), rule('c')]);
+    expect(ids(moveRuleToIndex(start, 'c', 0))).toEqual(ids(moveRuleToTop(start, 'c')));
+  });
+
+  it('does not mutate the config it was given', () => {
+    const original = config([rule('a'), rule('b')]);
+    moveRuleToIndex(original, 'b', 0);
+    expect(ids(original)).toEqual(['a', 'b']);
   });
 });
 
@@ -127,17 +165,103 @@ describe('ruleFromTrafficEntry', () => {
       ruleName: null,
       tabId: 3,
       pageUrl: null,
+      requestHeaders: [],
+      requestBody: null,
+      requestBodyTruncated: false,
+      responseHeaders: [],
+      responseBody: null,
+      responseBodyTruncated: false,
       ...overrides,
     };
   }
 
-  it('matches on the path only, so query strings do not over-narrow it', () => {
+  it('copies the response body the request actually returned', () => {
+    const rule = ruleFromTrafficEntry(entry({ responseBody: '{"id":7,"name":"Ada"}' }), 0);
+    expect(rule.action).toMatchObject({
+      kind: 'respond',
+      // Pretty-printed, because it is about to be edited by hand.
+      body: { type: 'json', value: '{\n  "id": 7,\n  "name": "Ada"\n}' },
+    });
+  });
+
+  it('keeps a body that is not JSON as text, exactly as sent', () => {
+    const rule = ruleFromTrafficEntry(entry({ responseBody: 'not json at all' }), 0);
+    expect(rule.action).toMatchObject({ body: { type: 'text', value: 'not json at all' } });
+  });
+
+  it('falls back to an empty object when no body was captured', () => {
+    const rule = ruleFromTrafficEntry(entry({ responseBody: null }), 0);
+    expect(rule.action).toMatchObject({ body: { type: 'json', value: '{}' } });
+  });
+
+  it('copies the response headers worth copying', () => {
+    const rule = ruleFromTrafficEntry(
+      entry({
+        responseHeaders: [
+          { name: 'Content-Type', value: 'application/json' },
+          { name: 'Cache-Control', value: 'no-store' },
+          { name: 'Access-Control-Allow-Origin', value: '*' },
+        ],
+      }),
+      0,
+    );
+    expect(rule.action.kind === 'respond' && rule.action.headers).toEqual([
+      { name: 'Content-Type', value: 'application/json' },
+      { name: 'Cache-Control', value: 'no-store' },
+      { name: 'Access-Control-Allow-Origin', value: '*' },
+    ]);
+  });
+
+  it('drops headers that describe the transfer rather than the response', () => {
+    const rule = ruleFromTrafficEntry(
+      entry({
+        responseHeaders: [
+          { name: 'content-length', value: '512' },
+          { name: 'Date', value: 'Thu, 11 Sep 2026 09:00:00 GMT' },
+          { name: 'set-cookie', value: 'session=abc' },
+          { name: 'content-encoding', value: 'gzip' },
+          { name: 'ETag', value: '"v1"' },
+        ],
+      }),
+      0,
+    );
+    expect(rule.action.kind === 'respond' && rule.action.headers).toEqual([
+      { name: 'ETag', value: '"v1"' },
+    ]);
+  });
+
+  it('keeps the first of a repeated header and ignores blank names', () => {
+    const rule = ruleFromTrafficEntry(
+      entry({
+        responseHeaders: [
+          { name: 'Vary', value: 'Accept' },
+          { name: 'vary', value: 'Accept' },
+          { name: '  ', value: 'ignored' },
+        ],
+      }),
+      0,
+    );
+    expect(rule.action.kind === 'respond' && rule.action.headers).toEqual([
+      { name: 'Vary', value: 'Accept' },
+    ]);
+  });
+
+  it('keeps the host and drops the query string', () => {
+    // Host, because taking over the same path on every origin the page talks
+    // to is not what clicking one row means. No query, because that is the
+    // part that varies between calls.
     const created = ruleFromTrafficEntry(entry(), 1);
     expect(created.matcher.url).toEqual({
       mode: 'contains',
-      value: '/v1/users',
+      value: 'api.example.com/v1/users',
       caseSensitive: false,
     });
+  });
+
+  it('starts with no conditions', () => {
+    const created = ruleFromTrafficEntry(entry(), 1);
+    expect(created.matcher.conditions).toEqual([]);
+    expect(created.matcher.conditionMode).toBe('all');
   });
 
   it('keeps the observed method and status', () => {
@@ -154,5 +278,35 @@ describe('ruleFromTrafficEntry', () => {
   it('uses the raw url when it will not parse', () => {
     const created = ruleFromTrafficEntry(entry({ url: 'not a url' }), 1);
     expect(created.matcher.url.value).toBe('not a url');
+  });
+
+  // Everything below is about one failure: the worker validates every write and
+  // drops what it cannot parse, so a rule seeded with a method or status no
+  // matcher can hold was created, sent, discarded, and never appeared -- the
+  // button looked broken.
+  it('normalizes a lowercase method', () => {
+    const created = ruleFromTrafficEntry(entry({ method: 'get' }), 1);
+    expect(created.matcher.methods).toEqual(['GET']);
+  });
+
+  it('falls back to any method for one the matcher does not know', () => {
+    const created = ruleFromTrafficEntry(entry({ method: 'PROPFIND' }), 1);
+    expect(created.matcher.methods).toEqual(['*']);
+  });
+
+  it('falls back to 200 for a status no response can be built from', () => {
+    // A cross-origin request that failed logs 0, and the Fetch spec refuses to
+    // construct a Response below 200.
+    for (const status of [0, 100, 600]) {
+      const created = ruleFromTrafficEntry(entry({ status }), 1);
+      expect(created.action).toMatchObject({ status: 200 });
+    }
+  });
+
+  it('produces a rule the worker will accept', () => {
+    // The guard that matters: whatever the page did, what comes out of here
+    // has to survive the same validation every write goes through.
+    const hostile = entry({ method: 'query', status: 0, url: 'not a url' });
+    expect(parseRule(ruleFromTrafficEntry(hostile, 1))).not.toBeNull();
   });
 });

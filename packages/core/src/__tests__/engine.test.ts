@@ -19,7 +19,12 @@ function rule(id: string, urlValue: string, overrides: Partial<MockRule> = {}): 
     id,
     name: id,
     enabled: true,
-    matcher: { url: { mode: 'contains', value: urlValue, caseSensitive: false }, methods: [METHOD_ANY] },
+    matcher: {
+      url: { mode: 'contains', value: urlValue, caseSensitive: false },
+      methods: [METHOD_ANY],
+      conditions: [],
+      conditionMode: 'all',
+    },
     action,
     createdAt: 0,
     updatedAt: 0,

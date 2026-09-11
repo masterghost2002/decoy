@@ -32,7 +32,7 @@ export function HeadersEditor({ headers, onChange }: HeadersEditorProps) {
       </div>
 
       {headers.length === 0 ? (
-        <p className="text-[11px] leading-snug text-ink-muted">
+        <p className="text-[12px] leading-snug text-ink-muted">
           Content-Type is set automatically from the body type.
         </p>
       ) : (
@@ -48,7 +48,7 @@ export function HeadersEditor({ headers, onChange }: HeadersEditorProps) {
                 }}
                 placeholder="X-Request-Id"
                 aria-label={`Header ${String(index + 1)} name`}
-                className="font-mono text-xs"
+                className="font-mono text-[13px]"
                 autoComplete="off"
               />
               <Input
@@ -58,7 +58,7 @@ export function HeadersEditor({ headers, onChange }: HeadersEditorProps) {
                 }}
                 placeholder="abc-123"
                 aria-label={`Header ${String(index + 1)} value`}
-                className="font-mono text-xs"
+                className="font-mono text-[13px]"
                 autoComplete="off"
               />
               <Button

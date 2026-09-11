@@ -62,12 +62,22 @@ function sendToWorker(message: ExtensionMessage): Promise<ExtensionResponse | nu
   });
 }
 
+/** `null` once the extension has been reloaded out from under this page. */
+function sandboxUrl(): string | undefined {
+  try {
+    return chrome.runtime.getURL('sandbox.html');
+  } catch {
+    return undefined;
+  }
+}
+
 function postConfigToPage(config: MocksmithConfig): void {
   const message: BridgeToPageMessage = {
     channel: PAGE_BRIDGE_CHANNEL,
     direction: 'to-page',
     kind: 'config',
     config,
+    sandboxUrl: sandboxUrl(),
   };
   try {
     window.postMessage(message, '*');
@@ -104,6 +114,16 @@ function handlePageMessage(event: MessageEvent): void {
     if (currentConfig !== null) postConfigToPage(currentConfig);
     return;
   }
+
+  if (event.data.kind === 'traffic-body') {
+    const { id, body, truncated } = event.data;
+    // Sent straight through rather than batched: it has to arrive after the
+    // entry it belongs to, and the entry may still be sitting in the batch.
+    flushTraffic();
+    void sendToWorker({ type: 'traffic:body', id, body, truncated });
+    return;
+  }
+
   queueTraffic(event.data.entry);
 }
 

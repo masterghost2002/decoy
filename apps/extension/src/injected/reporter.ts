@@ -2,6 +2,7 @@ import {
   PAGE_BRIDGE_CHANNEL,
   createId,
   type BridgeFromPageMessage,
+  type HeaderPair,
   type TrafficEntry,
   type TrafficOutcome,
   type TrafficTransport,
@@ -18,9 +19,20 @@ export interface TrafficDraft {
   status: number | null;
   ruleId: string | null;
   ruleName: string | null;
+  requestHeaders?: HeaderPair[];
+  requestBody?: string | null;
+  requestBodyTruncated?: boolean;
+  responseHeaders?: HeaderPair[];
+  responseBody?: string | null;
+  responseBodyTruncated?: boolean;
 }
 
-export type Reporter = (draft: TrafficDraft) => void;
+export interface Reporter {
+  /** Returns the id it assigned, so a late-arriving body can be attached to it. */
+  (draft: TrafficDraft): string;
+  /** Fills in a response body that finished reading after the entry went out. */
+  body: (id: string, body: string | null, truncated: boolean) => void;
+}
 
 /**
  * Traffic goes out over `window.postMessage`, which is the only channel between
@@ -28,24 +40,49 @@ export type Reporter = (draft: TrafficDraft) => void;
  * observe these messages -- acceptable, since the page already made every
  * request being reported.
  */
+function post(message: BridgeFromPageMessage): void {
+  try {
+    window.postMessage(message, '*');
+  } catch {
+    // A page that has torn down its window is not worth a console error.
+  }
+}
+
 export function createReporter(): Reporter {
-  return (draft) => {
+  const report = ((draft: TrafficDraft) => {
+    const id = createId('req');
     const entry: TrafficEntry = {
-      id: createId('req'),
+      id,
       tabId: null,
       pageUrl: null,
+      requestHeaders: [],
+      requestBody: null,
+      requestBodyTruncated: false,
+      responseHeaders: [],
+      responseBody: null,
+      responseBodyTruncated: false,
       ...draft,
     };
-    const message: BridgeFromPageMessage = {
+    post({
       channel: PAGE_BRIDGE_CHANNEL,
       direction: 'from-page',
       kind: 'traffic',
       entry,
-    };
-    try {
-      window.postMessage(message, '*');
-    } catch {
-      // A page that has torn down its window is not worth a console error.
-    }
+    });
+    return id;
+  }) as Reporter;
+
+  report.body = (id, body, truncated) => {
+    if (body === null) return;
+    post({
+      channel: PAGE_BRIDGE_CHANNEL,
+      direction: 'from-page',
+      kind: 'traffic-body',
+      id,
+      body,
+      truncated,
+    });
   };
+
+  return report;
 }

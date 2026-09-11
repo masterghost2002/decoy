@@ -64,8 +64,16 @@ export function useConfig(): ConfigState {
     pendingSaves.current += 1;
     saveConfig(next)
       .then((stored) => {
-        setConfig(stored);
-        setError(null);
+        setConfig(stored.config);
+        // The worker drops rules it cannot validate, and the reply is what we
+        // then render -- so a dropped rule would disappear from the list with
+        // no explanation. This is a bug in whatever built the rule, and it says
+        // so rather than pretending the click never happened.
+        setError(
+          stored.droppedRules > 0
+            ? `${String(stored.droppedRules)} rule${stored.droppedRules === 1 ? '' : 's'} could not be saved: the rule was not valid. Please report this.`
+            : null,
+        );
       })
       .catch((cause: unknown) => {
         setError(describeError(cause));

@@ -77,6 +77,39 @@ rules; the page owns the decision.
 The service worker builds as three separate single-file IIFE bundles, because Chrome loads them
 without a module loader and the injected script has to run at `document_start`.
 
+### Three surfaces, one component tree
+
+| Surface | How it opens | What it is for |
+| --- | --- | --- |
+| **Popup** | the toolbar button | a quick look and a quick toggle, 780 × 600 |
+| **Tab** | the ⧉ button in the popup | the full three-pane workspace |
+| **Floating panel** | the ⧈ button in the popup | staying open *over* the page you are debugging |
+
+The panel exists because of a hard limitation, not a preference: a browser action popup cannot be
+moved, cannot be resized, is capped by Chrome at 800 × 600, and **closes the moment you click the
+page behind it**. That last one is disqualifying for the actual loop here — change a rule, click
+the thing, watch what happens — because it makes you reopen the popup after every single click.
+
+So the panel mounts the same UI into the page instead, via `chrome.scripting` on demand (a 500 kB
+React bundle has no business loading on every page anyone visits). It is draggable by its header,
+resizable from any edge, rounded, and remembers where you left it. Injecting it a second time takes
+it away, which is how one toolbar button toggles it.
+
+Living inside someone else's document costs four things that the popup gets for free, and all four
+are handled rather than hoped about:
+
+- **A shadow root**, so the site cannot restyle the panel and Tailwind's preflight cannot reset the
+  site's margins. Every colour token is therefore declared for `:root` **and** `:host` — inside a
+  shadow root `:root` matches nothing, and one missed selector means the whole palette resolves to
+  nothing.
+- **Portals go in the panel, not `document.body`.** Radix defaults to the body, which is outside
+  the shadow root and so outside every stylesheet the panel has.
+- **Keyboard shortcuts bind to the shadow root**, not `window`. A tool that swallows the host app's
+  ⌘K and ⌘S is a tool you have to close in order to use the thing you are debugging.
+- **The layout measures itself.** Pane counts used to come from a media query, which reads the
+  *window*; a 900px panel in a 1600px window would have asked for a three-pane layout and had
+  nowhere to put it.
+
 ## The rule model
 
 A rule is a matcher plus an action. Rules are evaluated top to bottom and **the first enabled match
@@ -86,11 +119,31 @@ to win, move it up.
 ```
 match:  url (contains | equals | startsWith | endsWith | wildcard | regex)
         methods (any, or a specific set)
+        conditions (all | any of):
+            header <name>     cookie <name>    query <name>
+            body              body json <dotted.path>
+          × is present | is missing | equals | contains | starts with | ends with
+            | matches regex | is greater than | is less than
 
 then:   respond       status 200-599, headers, json/text/empty body, delay
+        stream        the same head, but the body arrives in chunks:
+                      sse | ndjson | text framing, an interval, a repeat count
         fail          failed (TypeError) | timeout (hangs) | aborted (AbortError), delay
         pass through   let this one reach the real network
 ```
+
+Url and method decide *which endpoint*; conditions decide *which call to it*. "This POST,
+but only when the payload's `user.role` is `admin`" cannot be said any other way, and it is a
+common thing to want:
+
+```
+match:  /api/profile · POST · body json  user.role  equals  admin
+then:   respond 403
+```
+
+Every other POST to the same url is left alone. Conditions are evaluated in the page, after the
+url and method have already matched, so the cost only lands on requests that got that far. A rule
+with no conditions behaves exactly as it did before conditions existed.
 
 `pass through` exists so you can carve an exception out of a broad rule: put
 `/api/users/me → pass through` above `/api/users → 404` and only the narrow one stays real.
@@ -98,7 +151,34 @@ then:   respond       status 200-599, headers, json/text/empty body, delay
 Some deliberate decisions worth knowing:
 
 - **Bodies are stored as raw strings and never reformatted.** Invalid JSON is a legitimate thing to
-  mock, so the editor warns about it and sends it anyway.
+  mock, so the editor warns about it and sends it anyway. The body editor opens full screen with a
+  find bar, because a JSON fixture is the one thing here that genuinely needs room. It also has a
+  **fields** view — name, type, value, one row each — which is a *view over the same string*, not a
+  second storage format: nothing is migrated, `raw` is always the truth, and a body that fields
+  cannot describe (an array, a bare scalar, something invalid) says so instead of flattening it.
+- **A url pattern without a scheme still matches.** The traffic panel displays urls as
+  `api.example.com/v1/users`, so that is what people paste. Before, every anchored mode --
+  `equals`, `startsWith`, `wildcard` -- silently failed on it, which read as "this tool does not
+  accept a full url with a domain". A pattern that does name a scheme is still matched literally,
+  so precision stays available. `startsWith` is deliberately *not* widened to bare paths;
+  `contains` is the mode for that, and it is the default.
+- **A streamed body is a different thing to test than a slow one.** `respond` hands over a
+  finished string, so it cannot reproduce progressive rendering, a reconnecting event source, or a
+  client that gives up halfway. `stream` sends a list of chunks on an interval instead, framed for
+  the format you pick — `sse` adds the `data:` prefix and the blank line that ends an event,
+  `ndjson` compacts each record onto its own line — and shows you what each chunk becomes on the
+  wire underneath the box you typed it in. `repeat: 0` never closes, which is the honest way to
+  mock an endpoint that is not supposed to end. Over `fetch` it is a real `ReadableStream`; over
+  XHR the chunks surface as `progress` events with `responseText` growing underneath them, and a
+  `xhr.timeout` still cuts off a body that had already started arriving.
+- **A capture on disk can be played back without being retyped.** Load or drop a file into the
+  chunk list and it is split where the format frames it -- an SSE event at the blank line that
+  ends it, an ndjson record per line, text per line with the newline kept -- so playing it back
+  reproduces the file rather than a rearrangement of it. The format is read off the file first,
+  because the split depends on it and an ndjson capture loaded as `sse` becomes one useless chunk
+  holding the whole thing. A response body takes a file the same way. Both are undoable from the
+  toast, and both are capped: every rule lives in one `chrome.storage.local` key, so a dropped-in
+  log file is not allowed to grow the config past the point where nothing can be saved.
 - **Delays interact with client timeouts properly.** A mocked XHR never touches the network, so its
   native `timeout` would never fire; Mocksmith emulates it. Set `xhr.timeout = 300` against a
   1500 ms mock and you get a real `timeout` event.
@@ -106,57 +186,168 @@ Some deliberate decisions worth knowing:
   more forgiving than the network hides bugs instead of finding them.
 - **Every request is logged, not just the mocked ones.** "My rule didn't fire and I can't see why"
   is the fastest way for a tool like this to waste an afternoon, so the traffic panel shows
-  passthrough, mocked and failed requests alike, and the rule editor has a *Test a url* box that
-  answers match/no-match against the pattern you are editing.
+  passthrough, mocked and failed requests alike, and the rule editor has a *Does this pattern
+  match?* box that answers yes/no against the pattern you are editing.
+- **Clicking a request opens what the page actually sent** — request headers, the serialized
+  payload, and the response headers — so "what did my app send?" does not send you back to the
+  DevTools network panel. Payloads are capped at 64 kB for capture; the real request is
+  unaffected.
+- **Each rule shows how many times it has fired**, so "is this thing even doing anything?" is
+  answered by the list rather than by guesswork. Counts live in session storage and survive an
+  MV3 worker restart; the toolbar badge shows the mocked count for the active tab.
 - **Aborted and timed-out requests are logged too**, since those are usually the ones you are
   chasing.
 
 ## Design
 
 The surface is deliberately quiet, because it sits next to DevTools and gets read at a glance
-rather than admired.
+rather than admired. Quiet is a matter of size, weight and density — never of fading text below
+the legibility floor.
 
-- **Warm neutrals, one accent.** A near-black ink with a brown cast (`#1A1714`), paper surfaces,
-  and goldenrod as the only accent. Gold means exactly one thing — *requests are being
-  intercepted* — so it is spent on the master switch, the active rule's rail, and nothing else.
-  Ordinary primary buttons get a soft gold fill, not a saturated one.
+- **Warm neutrals, one accent, one meaning.** A near-black ink with a brown cast (`#1A1714`), paper
+  surfaces, and goldenrod as the only accent. Gold means exactly one thing — *requests are being
+  intercepted* — so it is spent on the master switch, the per-rule switch and the `mocked` outcome,
+  and nowhere else. Selection, primary actions, active tabs and the focus ring are ink and neutral.
+  Screenshot any surface and count the gold: if one element is not about interception, it is a bug.
+- **Gold comes in three variants**, because one token cannot do three jobs. `--gold` is a fill and
+  is never used for type on paper (2.15:1). `--gold-text` is its typographic sibling at 4.55:1.
+  `--on-gold` is the ink that goes *on* the fill, and it deliberately does not flip with the theme,
+  because `--gold` does not either.
 - **Colour carries category, not hierarchy.** Methods and status classes are outlined mono pills
   with their own colours (GET green, POST blue, DELETE red, 4xx amber, 5xx red), so a row is
   readable without a legend. The number or word is always present too — colour is never the only
   signal.
 - **Mono micro-labels.** Field labels and section eyebrows are uppercase IBM Plex Mono at 10px with
   wide tracking, which lets headings stay small and the content stay dominant.
-- **Structure from hairlines and soft shadows**, not hard borders: an inset 1px ring plus a warm
-  ambient shadow. Controls sit in recessed wells; buttons and pills are raised.
-- **Both themes ship**, following the OS. `pnpm e2e` with `E2E_SCREENSHOT_DIR` set renders every
-  surface in both so a change can be reviewed rather than assumed.
+- **Three line weights, because "a line" is two jobs.** `--hairline` and `--hairline-strong` are
+  structure — dividers, card rings, the outlines on static pills — and are decorative. `--edge` is
+  the boundary of an interactive control, where the line is the only thing saying "this is a
+  control", so it clears 3:1 against every surface. That needs roughly twice the alpha, which is
+  why it is a separate token rather than a heavier hairline applied to everything.
+- **Nothing that matters lives behind hover.** Core actions are always visible; rare and
+  destructive ones live in an always-visible `⋯` menu. Take a screenshot with no cursor on the
+  page — every action a user needs has to be in it.
+- **Explanations sit at the point of decision.** Anything that changes behaviour gets one line of
+  always-visible helper text under the control. The `title` attribute is not an information
+  channel: it waits a second, never appears on keyboard focus, is invisible on touch and is
+  announced inconsistently. Tooltips name icon-only buttons and do nothing else; a click-triggered
+  `?` popover is reserved for the priority model and wildcard/regex syntax.
+- **Both themes ship**, following the OS, with an in-app override in the header. `pnpm e2e` with
+  `E2E_SCREENSHOT_DIR` set renders every surface in both so a change can be reviewed rather than
+  assumed.
 
 Tokens live in `src/ui/styles.css` as CSS variables mapped into Tailwind's theme, so a palette
-change is one file. `eyebrow` and `tabular` are custom utilities.
+change is one file. `eyebrow`, `helper`, `tabular` and `hit-28` are custom utilities.
+
+`pnpm --filter @mocksmith/extension contrast` parses those tokens back out of the stylesheet and
+checks every pair that carries type against 4.5:1, and every control boundary against 3:1. It runs
+as part of `build`, because the last two regressions it would have caught were both invisible by
+eye: a label at 2.43:1, and an ink that read correctly in one theme and at 1.56:1 in the other
+because it flipped with the theme while the fill under it did not.
+
+### Nothing moves under the cursor
+
+Layout shift is treated as a defect, not a detail, because every surface here is read while you are
+already pointing at something on it.
+
+- The **page-scope strip** is always rendered at one fixed height. Pausing swaps its words and puts
+  **Resume** inside it; the first request arriving swaps them again. The tabs and the list below
+  never move.
+- **Worker errors go to the toast layer**, an overlay, rather than inserting a red bar between the
+  tabs and the panel at the exact moment something has gone wrong.
+- The **rules filter is unconditional.** It used to appear once the list passed six rules, so adding
+  a sixth rule pushed the whole list down.
+- The **fired stamp** collapses from `fired 2s ago · 14×` to `· 14×` by container width rather than
+  viewport width, so the same list can be dense in a 300px pane and generous in a wide one
+  without either one reflowing.
+
+### The split is yours to make
+
+The tab view is a list you scan, a form you fill in, and a preview you check, all competing for the
+same screen — and which one deserves the room changes with what you are doing. Writing a long json
+body wants the middle; comparing eleven rules wants the left. No fixed set of column widths is right
+for both, so the separators are draggable (shadcn `resizable`, on `react-resizable-panels`), either
+side pane folds away from the toolbar, and the split is remembered.
+
+Only the middle pane scrolls as a pane. The two beside it are pinned headers over their own
+scrolling regions, so they hold still while the form between them is being read.
+
+### Answering "is it working?"
+
+Mocksmith intervenes in someone else's page, so its first job on every surface is evidence —
+configuration state is not evidence. Four signals, at four distances:
+
+| Distance | Signal |
+| --- | --- |
+| Browser chrome | **Toolbar badge** — count of mocks on the active tab, cleared on navigation, grey when paused |
+| Popup header | **Page-scope strip** — `app.local · 12 requests · 9 mocked · 2 rules fired`, with a pulse on each interception |
+| Rule row | **Fired stamp** — `fired 2s ago · 14×`, decaying to a plain count after a minute |
+| Traffic row | **Named decider** — `MOCKED by 02 Users 404`, as visible text |
+
+### Mock this
+
+The fastest path through the product is: see a real request in **Traffic**, press **Mock this**,
+change one field, reload. For that to be one edit rather than twenty, the new rule is prefilled with
+what the endpoint actually returned — its status, its response headers, and its response body,
+pretty-printed when it is JSON and left verbatim when it is not.
+
+Reading a real response body is the only part of this that is not free. It is taken from a
+`clone()` of the response, never awaited on the request path, capped at 64 kB, skipped entirely for
+opaque and non-textual responses, and delivered as a follow-up message keyed to the traffic entry —
+so the page's own `fetch` is not slowed down and the log stays live while the body is still
+arriving. Headers that describe one particular transfer rather than the response (`content-length`,
+`content-encoding`, `date`, `set-cookie`, …) are dropped rather than copied into a rule where they
+would be wrong.
+
+The other half of the question is *why didn't my rule fire?*, and the answer is
+**shadow detection**: when an earlier enabled rule provably matches everything a later one does,
+the row says `never fires — 01 matches everything this rule does` and offers **Move above 01**.
+It is computed from the matchers in `packages/core/src/shadow.ts`, and the bar there is soundness
+rather than coverage — wildcard and regex haystacks are skipped rather than guessed at, because a
+false badge on a working rule is worse than staying quiet. The match tester answers the same
+question from the other direction: paste a url and it names the rule that wins, not merely whether
+this one matches.
 
 ## Testing
 
 ```bash
 pnpm typecheck                              # every package
-pnpm test                                   # 62 unit tests
-pnpm --filter @mocksmith/extension e2e      # 20 end-to-end checks in a real Chrome
+pnpm test                                   # 138 unit tests
+pnpm --filter @mocksmith/extension contrast # the palette's contrast floors
+pnpm --filter @mocksmith/extension e2e      # 37 end-to-end checks in a real Chrome
 ```
 
-The unit tests cover the matcher, the response planner, config validation and the editor's rule
-transforms. The E2E run is the one that matters for the interceptor: it launches a real Chrome with
+The unit tests cover the matcher, the response planner, config validation, shadow detection, the
+page-scope summary and the editor's rule transforms. The E2E run is the one that matters for the interceptor: it launches a real Chrome with
 the built extension loaded, seeds a rule set through `chrome.storage.local`, serves a fixture page
 over http, and asserts real behaviour from inside that page — status and header synthesis, rule
 ordering, delays, aborts mid-delay, hung requests, 204 body handling, the full XHR `readyState`
 lifecycle, handlers attached after `send()`, `responseType` variants, emulated client timeouts,
-instance reuse, and passthrough. It then loads the extension's own UI and checks that the rules and
-the traffic those scenarios produced both render.
+instance reuse, and passthrough. Conditions get their own scenarios — a json payload gate, a header
+gate, a cookie gate, `any` mode, and an XHR `send()` body — each asserting both that the matching
+call is intercepted and that the near-identical non-matching call is not.
+
+Streams are checked the same way, because "arrived in pieces" is not something a unit test can
+observe: an SSE rule is read chunk by chunk through a `ReadableStream` and asserted to take more
+than one read, an ndjson rule is asserted to compact and repeat, an endless rule is read past the
+end of its own chunk list and then aborted, and an XHR stream is asserted to expose a partial
+`responseText` across several `readyState === 3` ticks.
+
+It then loads the extension's own UI and checks that the rules and the traffic those scenarios
+produced both render — and finally injects the **floating panel** into a real page and asserts the
+things only a real browser can answer: that the shadow root mounts, that a colour token declared on
+`:host` actually resolves inside it, that the corners stay rounded, that the rule editor rendered
+rather than a stack of unstyled boxes, and that a second toggle takes it away again.
 
 > **E2E needs a Chrome for Testing build.** Chrome 137+ ignores `--load-extension` on the stable
 > channel, so an installed Chrome cannot load an unpacked extension from the command line. The
 > script finds a build already cached by Playwright or Puppeteer; otherwise run
 > `npx playwright install chromium`, or set `CHROME_PATH`.
 >
-> `E2E_HEADED=1` watches it happen. `E2E_SCREENSHOT_DIR=./shots` writes PNGs of each UI surface.
+> `E2E_HEADED=1` watches it happen. `E2E_SCREENSHOT_DIR=./shots` writes PNGs of each UI surface in
+> both themes — including the states nothing else exercises: a shadowed rule, the paused list, first
+> run, the match-mode listbox open, the stream editor, the body fields view, the method multi-select
+> open, a dirty editor with its unsaved-changes bar, and the floating panel over a live page.
 
 `fixtures/index.html` is also a manual harness: serve it, load the extension, click **Run checks**.
 
@@ -165,7 +356,9 @@ the traffic those scenarios produced both render.
 Honest list, so nobody debugs a limitation as if it were a bug:
 
 - Only `fetch` and `XMLHttpRequest` are intercepted. Images, media, stylesheets, documents,
-  WebSockets and `EventSource` reach the network untouched.
+  WebSockets and `EventSource` reach the network untouched. A `stream` rule therefore mocks an
+  event stream read with `fetch` or XHR, but not one opened with `new EventSource(...)` — that
+  constructor never goes through either patch.
 - Requests made by a page's own service worker or in a dedicated worker are not intercepted; the
   patch is installed in the page's main world only.
 - A 1xx status cannot be mocked. The Fetch spec refuses to construct such a `Response`, and it is
@@ -178,8 +371,18 @@ Honest list, so nobody debugs a limitation as if it were a bug:
   then pass through rather than stall the page. A truly synchronous XHR cannot wait at all and
   decides with whatever rules are already known.
 - The rule editor saves explicitly. Toggles apply immediately, but a half-typed url pattern should
-  not hijack traffic, so edits need **Save**.
-- Themes follow the OS. There is no in-app light/dark toggle yet.
+  not hijack traffic, so edits need **Save** — or `⌘S`. The enabled Save button is the signal; there
+  is no banner, because one would move the form under your cursor on every keystroke.
+- **Conditions only see what the page can see.** `HttpOnly` cookies are invisible to
+  `document.cookie` and so cannot be matched on. Request headers the browser adds itself — `Cookie`,
+  `Origin`, `User-Agent`, `Referer` — are not readable either; only headers the calling code set
+  explicitly are. A body sent as a `ReadableStream` is not read, because consuming it would break
+  the request, and a `Blob` body on a synchronous XHR is skipped for the same reason.
+- Rule hit counts live in session storage, so they reset when the browser restarts, and the
+  per-tab badge count resets on navigation.
+- Shadow detection is sound, not exhaustive. It reports only what it can prove from the matchers,
+  so a rule shadowed through a wildcard or regex pattern is not flagged. It will not tell you a
+  working rule never fires.
 
 ### Security notes
 
@@ -189,8 +392,10 @@ made every request being reported, and a forged config message could only change
 own requests are answered — no cross-origin reach and no extension privilege. It is worth knowing
 before you enable Mocksmith on a page you do not trust.
 
-The extension asks for `storage` plus `<all_urls>` host access, and nothing else. `<all_urls>` is
-inherent: a tool that mocks any request has to be able to run on any page.
+The extension asks for `storage`, `scripting`, and `<all_urls>` host access, and nothing else.
+`<all_urls>` is inherent: a tool that mocks any request has to be able to run on any page.
+`scripting` is what injects the floating panel into the tab you ask for it in, on demand — it is
+not used to put anything on a page you did not ask for.
 
 ## Roadmap
 
@@ -200,9 +405,11 @@ Ordered by how much each unblocks:
    state" and "server on fire" become one click each instead of six toggles.
 2. **Record then replay** — capture a real response once and turn it into a mock, which is the
    direct answer to "the backend is not deployed yet".
-3. **WebSocket and SSE mocking** — a scriptable virtual server: message timelines, pattern-matched
-   replies, close codes, reconnect storms. The page-world patch is the only mechanism that can
-   inject frames, so this builds on layer 1.
+3. **WebSocket and `EventSource` mocking** — a scriptable virtual server: message timelines,
+   pattern-matched replies, close codes, reconnect storms. The `stream` action already covers an
+   event stream read through `fetch` or XHR; what is left is the two APIs that never touch either
+   patch. The page-world patch is the only mechanism that can inject frames, so this builds on
+   layer 1.
 4. **Layer 2 (`declarativeNetRequest`)** — block, redirect and rewrite headers for images, media,
    fonts, css and documents.
 5. **Import** — Postman collections, OpenAPI specs and HAR files into rules, with AI-generated

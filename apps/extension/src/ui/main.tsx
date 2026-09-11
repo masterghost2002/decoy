@@ -2,6 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App, type ViewKind } from '@/ui/App';
+import { ErrorBoundary } from '@/ui/components/ui/error-boundary';
+import { ToastProvider } from '@/ui/components/ui/toast';
+import { TooltipProvider } from '@/ui/components/ui/tooltip';
 
 import '@/ui/styles.css';
 
@@ -16,6 +19,12 @@ const view: ViewKind = document.body.dataset.view === 'tab' ? 'tab' : 'popup';
 
 createRoot(container).render(
   <StrictMode>
-    <App view={view} />
+    <ErrorBoundary>
+      <TooltipProvider>
+        <ToastProvider>
+          <App view={view} />
+        </ToastProvider>
+      </TooltipProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

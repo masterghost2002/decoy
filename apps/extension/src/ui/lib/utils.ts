@@ -28,3 +28,12 @@ export function formatClockTime(epochMs: number): string {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
+
+/**
+ * Positions are one-based and zero-padded, so `01` and `12` occupy the same
+ * width in a column and a rule can be referred to by name in prose: "02 catches
+ * it first".
+ */
+export function formatOrdinal(index: number): string {
+  return String(index + 1).padStart(2, '0');
+}

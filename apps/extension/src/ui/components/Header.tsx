@@ -1,36 +1,84 @@
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Monitor, Moon, PictureInPicture2, Sun, X } from 'lucide-react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import { Button } from '@/ui/components/ui/button';
+import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from '@/ui/components/ui/menu';
 import { Switch } from '@/ui/components/ui/switch';
+import { Tooltip } from '@/ui/components/ui/tooltip';
 import { openFullPage } from '@/ui/lib/messaging';
+import { THEME_CHOICES, type ThemeChoice } from '@/ui/hooks/useTheme';
 import { cn } from '@/ui/lib/utils';
+
+const THEME_ICON = { system: Monitor, light: Sun, dark: Moon } as const;
+const THEME_LABEL: Record<ThemeChoice, string> = {
+  system: 'Match the system',
+  light: 'Light',
+  dark: 'Dark',
+};
 
 export interface HeaderProps {
   enabled: boolean;
   onToggle: (next: boolean) => void;
   enabledRuleCount: number;
   showOpenInTab: boolean;
+  theme: ThemeChoice;
+  onThemeChange: (next: ThemeChoice) => void;
+  /** Popup only: drops the floating panel into the page behind it. */
+  onOpenPanel?: () => void;
+  /** Floating panel only: takes it back off the page. */
+  onClose?: () => void;
+  /** Floating panel only: makes this bar the thing you drag the panel by. */
+  onDragPointerDown?: (event: ReactPointerEvent<HTMLElement>) => void;
 }
 
-export function Header({ enabled, onToggle, enabledRuleCount, showOpenInTab }: HeaderProps) {
+export function Header({
+  enabled,
+  onToggle,
+  enabledRuleCount,
+  showOpenInTab,
+  theme,
+  onThemeChange,
+  onOpenPanel,
+  onClose,
+  onDragPointerDown,
+}: HeaderProps) {
+  const ThemeIcon = THEME_ICON[theme];
+  const draggable = onDragPointerDown !== undefined;
+
   return (
-    <header className="flex items-center gap-2.5 border-b border-hairline bg-surface px-3.5 py-2.5">
+    <header
+      onPointerDown={(event) => {
+        // Only the bar itself drags. Starting a drag from the master switch
+        // would mean the panel lurched every time somebody paused mocking.
+        if (event.target instanceof Element && event.target.closest('button, input, [role]')) {
+          return;
+        }
+        onDragPointerDown?.(event);
+      }}
+      className={cn(
+        'flex shrink-0 items-center gap-2.5 border-b border-hairline bg-surface px-3.5 py-2.5',
+        draggable && 'cursor-grab touch-none select-none active:cursor-grabbing',
+      )}
+    >
       {/* The real toolbar icon, so the surface and the browser chrome match. */}
       <img
         src={chrome.runtime.getURL('icons/icon-32.png')}
         alt=""
         aria-hidden
+        draggable={false}
         className="size-[18px] rounded"
       />
-      <h1 className="text-[15px] font-semibold tracking-[-0.02em]">Mocksmith</h1>
+      <h1 className="text-[16.5px] font-semibold tracking-[-0.02em]">Mocksmith</h1>
 
       <div className="flex-1" />
 
-      {/* The state is spelled out, because colour alone must not carry it. */}
+      {/* Spelled out, because colour alone must not carry it -- and gold as
+          *type* has to come from the typographic gold, not the fill gold. */}
       <span
-        className={cn('eyebrow', enabled ? 'text-warn' : 'text-ink-faint')}
+        className={cn('eyebrow flex items-center gap-1.5', enabled && 'text-gold-text')}
         aria-live="polite"
       >
+        {enabled ? <span aria-hidden className="size-[7px] rounded-full bg-gold" /> : null}
         {enabled
           ? enabledRuleCount === 0
             ? 'On · no rules'
@@ -43,16 +91,69 @@ export function Header({ enabled, onToggle, enabledRuleCount, showOpenInTab }: H
         aria-label={enabled ? 'Pause all mocking' : 'Resume mocking'}
       />
 
+      <Menu>
+        <MenuTrigger asChild>
+          <Button size="icon-sm" variant="ghost" aria-label={`Theme: ${THEME_LABEL[theme]}`}>
+            <ThemeIcon />
+          </Button>
+        </MenuTrigger>
+        <MenuContent>
+          <MenuLabel>Theme</MenuLabel>
+          {THEME_CHOICES.map((choice) => {
+            const Icon = THEME_ICON[choice];
+            return (
+              <MenuItem
+                key={choice}
+                onSelect={() => {
+                  onThemeChange(choice);
+                }}
+                className={cn(choice === theme && 'bg-wash')}
+              >
+                <Icon />
+                {THEME_LABEL[choice]}
+              </MenuItem>
+            );
+          })}
+        </MenuContent>
+      </Menu>
+
+      {onOpenPanel !== undefined ? (
+        <Tooltip label="Float over this page">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={onOpenPanel}
+            aria-label="Open Mocksmith as a floating panel over this page"
+          >
+            <PictureInPicture2 />
+          </Button>
+        </Tooltip>
+      ) : null}
+
       {showOpenInTab ? (
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          onClick={openFullPage}
-          aria-label="Open Mocksmith in a full tab"
-          title="Open in a full tab"
-        >
-          <ExternalLink />
-        </Button>
+        <Tooltip label="Open in a full tab">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={openFullPage}
+            aria-label="Open Mocksmith in a full tab"
+          >
+            <ExternalLink />
+          </Button>
+        </Tooltip>
+      ) : null}
+
+      {onClose !== undefined ? (
+        <Tooltip label="Close the panel">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={onClose}
+            aria-label="Close the Mocksmith panel"
+          >
+            <X />
+          </Button>
+        </Tooltip>
       ) : null}
     </header>
   );

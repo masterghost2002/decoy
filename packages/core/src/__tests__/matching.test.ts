@@ -115,18 +115,39 @@ describe('matchesMethod', () => {
   });
 });
 
+describe('urls pasted without a scheme', () => {
+  // The traffic panel shows `api.example.com/v1/users`, so that is what people
+  // paste. Before this, every anchored mode silently failed on it.
+  const PASTED = 'api.example.com/v1/users';
+
+  it('matches in the anchored modes', () => {
+    expect(matchesUrl(matcher({ mode: 'equals', value: 'api.example.com/v1/users?page=2' }), API_URL)).toBe(true);
+    expect(matchesUrl(matcher({ mode: 'startsWith', value: PASTED }), API_URL)).toBe(true);
+    expect(matchesUrl(matcher({ mode: 'wildcard', value: 'api.example.com/v1/*' }), API_URL)).toBe(true);
+  });
+
+  it('still respects a scheme when one is given', () => {
+    expect(matchesUrl(matcher({ mode: 'startsWith', value: 'http://api.example.com' }), API_URL)).toBe(false);
+    expect(matchesUrl(matcher({ mode: 'startsWith', value: 'https://api.example.com' }), API_URL)).toBe(true);
+  });
+
+  it('does not quietly widen startsWith to bare paths', () => {
+    expect(matchesUrl(matcher({ mode: 'startsWith', value: '/v1' }), API_URL)).toBe(false);
+  });
+});
+
 describe('matchesRequest', () => {
   it('requires both the method and the url to match', () => {
     const request = { url: API_URL, method: 'GET' };
     expect(
       matchesRequest(
-        { url: matcher({ mode: 'contains', value: '/v1/users' }), methods: ['GET'] },
+        { url: matcher({ mode: 'contains', value: '/v1/users' }), methods: ['GET'], conditions: [], conditionMode: 'all' },
         request,
       ),
     ).toBe(true);
     expect(
       matchesRequest(
-        { url: matcher({ mode: 'contains', value: '/v1/users' }), methods: ['POST'] },
+        { url: matcher({ mode: 'contains', value: '/v1/users' }), methods: ['POST'], conditions: [], conditionMode: 'all' },
         request,
       ),
     ).toBe(false);

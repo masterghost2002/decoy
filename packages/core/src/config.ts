@@ -28,6 +28,8 @@ export function createStarterConfig(now: number): MocksmithConfig {
     matcher: {
       url: { mode: 'contains', value: '/api/users', caseSensitive: false },
       methods: ['GET'],
+      conditions: [],
+      conditionMode: 'all',
     },
     action: {
       kind: 'respond',

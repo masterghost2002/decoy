@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveAction, type RespondPlan } from '../resolve.js';
-import type { RespondAction, RuleAction } from '../rule.js';
+import { resolveAction, type RespondPlan, type StreamPlan } from '../resolve.js';
+import type { RespondAction, RuleAction, StreamAction } from '../rule.js';
 
 function respond(overrides: Partial<RespondAction> = {}): RespondAction {
   return {
@@ -102,5 +102,95 @@ describe('resolveAction for the other kinds', () => {
 
   it('resolves passthrough to a passthrough plan', () => {
     expect(resolveAction({ kind: 'passthrough' })).toEqual({ kind: 'passthrough' });
+  });
+});
+
+describe('resolveAction for stream', () => {
+  const stream = (overrides: Partial<StreamAction> = {}): StreamAction => ({
+    kind: 'stream',
+    status: 200,
+    statusText: '',
+    headers: [],
+    format: 'sse',
+    chunks: [{ id: 'c1', value: '{"n":1}' }],
+    delayMs: 0,
+    intervalMs: 500,
+    repeat: 1,
+    ...overrides,
+  });
+
+  function asStream(action: RuleAction): StreamPlan {
+    const plan = resolveAction(action);
+    if (plan.kind !== 'stream') throw new Error(`expected a stream plan, got ${plan.kind}`);
+    return plan;
+  }
+
+  it('defaults the content type from the format', () => {
+    expect(asStream(stream()).headers).toContainEqual(['content-type', 'text/event-stream']);
+    expect(asStream(stream({ format: 'ndjson' })).headers).toContainEqual([
+      'content-type',
+      'application/x-ndjson',
+    ]);
+    expect(asStream(stream({ format: 'text' })).headers).toContainEqual([
+      'content-type',
+      'text/plain;charset=utf-8',
+    ]);
+  });
+
+  it('never overrides a content type the rule set itself', () => {
+    const plan = asStream(
+      stream({ headers: [{ name: 'Content-Type', value: 'text/event-stream; charset=utf-8' }] }),
+    );
+    expect(plan.headers.filter(([name]) => name.toLowerCase() === 'content-type')).toHaveLength(1);
+  });
+
+  it('wraps a bare sse payload in a data field and terminates the event', () => {
+    expect(asStream(stream()).chunks).toEqual(['data: {"n":1}\n\n']);
+  });
+
+  it('leaves a chunk that already names an sse field alone', () => {
+    const plan = asStream(stream({ chunks: [{ id: 'c1', value: 'event: ping\ndata: {}' }] }));
+    expect(plan.chunks).toEqual(['event: ping\ndata: {}\n\n']);
+  });
+
+  it('prefixes every line of a multi-line sse payload', () => {
+    const plan = asStream(stream({ chunks: [{ id: 'c1', value: 'one\ntwo' }] }));
+    expect(plan.chunks).toEqual(['data: one\ndata: two\n\n']);
+  });
+
+  it('compacts pretty-printed json onto one ndjson line', () => {
+    const plan = asStream(
+      stream({ format: 'ndjson', chunks: [{ id: 'c1', value: '{\n  "n": 1\n}' }] }),
+    );
+    expect(plan.chunks).toEqual(['{"n":1}\n']);
+  });
+
+  it('sends text chunks exactly as written, with no separator', () => {
+    const plan = asStream(stream({ format: 'text', chunks: [{ id: 'c1', value: 'half a ' }] }));
+    expect(plan.chunks).toEqual(['half a ']);
+  });
+
+  it('drops chunks that would put nothing on the wire', () => {
+    const plan = asStream(
+      stream({ chunks: [{ id: 'c1', value: '  ' }, { id: 'c2', value: 'x' }] }),
+    );
+    expect(plan.chunks).toEqual(['data: x\n\n']);
+  });
+
+  it('drops every chunk on a status that cannot carry a body', () => {
+    expect(asStream(stream({ status: 204 })).chunks).toEqual([]);
+  });
+
+  it('fills in the conventional reason phrase, like respond does', () => {
+    expect(asStream(stream({ status: 503 })).statusText).toBe('Service Unavailable');
+  });
+
+  it('keeps zero repeats as the never-ending sentinel', () => {
+    expect(asStream(stream({ repeat: 0 })).repeat).toBe(0);
+  });
+
+  it('clamps negative timings and repeats', () => {
+    const plan = asStream(stream({ delayMs: -5, intervalMs: -1, repeat: -3 }));
+    expect(plan).toMatchObject({ delayMs: 0, intervalMs: 0, repeat: 0 });
   });
 });

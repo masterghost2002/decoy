@@ -8,24 +8,19 @@ export const Tabs = TabsPrimitive.Root;
 export function TabsList({ className, ...props }: ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
-      className={cn(
-        'flex shrink-0 gap-5 border-b border-hairline bg-surface px-3.5',
-        className,
-      )}
+      className={cn('flex shrink-0 gap-5 border-b border-hairline bg-surface px-3.5', className)}
       {...props}
     />
   );
 }
 
-export function TabsTrigger({
-  className,
-  ...props
-}: ComponentProps<typeof TabsPrimitive.Trigger>) {
+export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        'eyebrow relative -mb-px border-b-2 border-transparent py-2.5 transition-colors',
-        'hover:text-ink-muted data-[state=active]:border-gold data-[state=active]:text-ink',
+        'eyebrow relative -mb-px border-b-2 border-transparent py-2.5 transition-colors duration-[120ms]',
+        // Ink, not gold: which tab is open is navigation, not interception.
+        'hover:text-ink-muted data-[state=active]:border-ink data-[state=active]:text-ink',
         className,
       )}
       {...props}
@@ -33,10 +28,7 @@ export function TabsTrigger({
   );
 }
 
-export function TabsContent({
-  className,
-  ...props
-}: ComponentProps<typeof TabsPrimitive.Content>) {
+export function TabsContent({ className, ...props }: ComponentProps<typeof TabsPrimitive.Content>) {
   return (
     <TabsPrimitive.Content
       className={cn('min-h-0 flex-1 focus-visible:outline-none', className)}

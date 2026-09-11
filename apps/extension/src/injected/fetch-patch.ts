@@ -1,14 +1,41 @@
-import { decideRequest, type NetworkErrorType } from '@mocksmith/core';
+import {
+  capBody,
+  decideRequest,
+  type HeaderPair,
+  type NetworkErrorType,
+  type SettledPlan,
+} from '@mocksmith/core';
 
+import {
+  assembleRequest,
+  collectFetchBody,
+  collectFetchHeaders,
+  headersToPairs,
+} from './facts.js';
 import type { ConfigGate } from './config-gate.js';
+import type { HandlerClient } from './handler-client.js';
+import { settleDecision } from './handler-run.js';
 import type { Reporter } from './reporter.js';
-import { buildMockResponse } from './response.js';
+import { captureResponseBody } from './response-capture.js';
+import { buildMockResponse, buildStreamResponse } from './response.js';
 import { delay, hangForever } from './timing.js';
 import { describeFetchRequest, resolveAbortSignal } from './url.js';
 
 export interface FetchPatchContext {
   gate: ConfigGate;
   report: Reporter;
+  handlers: HandlerClient;
+}
+
+/**
+ * What the traffic log records as the response body. A stream reports one pass
+ * of its chunk list: that is what the rule says it sends, and a repeating
+ * stream only says it again.
+ */
+function mockedBodyOf(plan: SettledPlan): string | null {
+  if (plan.kind === 'respond') return plan.body;
+  if (plan.kind === 'stream') return capBody(plan.chunks.join('')).body;
+  return null;
 }
 
 /** Mirrors the errors the platform itself raises, so app error handling behaves. */
@@ -31,9 +58,37 @@ export function installFetchPatch(context: FetchPatchContext): void {
     const startedAt = Date.now();
     const descriptor = describeFetchRequest(input, init);
 
+    // Headers, cookies and payload are needed before the decision, because a
+    // rule may carry conditions that test them.
+    const collected = assembleRequest(
+      descriptor.url,
+      descriptor.method,
+      collectFetchHeaders(input, init),
+      await collectFetchBody(input, init),
+    );
+    const detail = {
+      requestHeaders: collected.requestHeaders,
+      requestBody: collected.requestBody,
+      requestBodyTruncated: collected.requestBodyTruncated,
+    };
+
     if (!context.gate.isReady) await context.gate.waitUntilReady();
     const config = context.gate.snapshot();
-    const decision = config === null ? null : decideRequest(config, descriptor);
+    const found = config === null ? null : decideRequest(config, collected.facts);
+
+    // A rule whose action is code has not answered yet: it has to run first,
+    // and it may decline, in which case the rule below it answers instead.
+    const decision =
+      found === null || config === null
+        ? null
+        : await settleDecision({
+            config,
+            facts: collected.facts,
+            decision: found,
+            client: context.handlers,
+            transport: 'fetch',
+            startedAt,
+          });
 
     const ruleId = decision?.rule.id ?? null;
     const ruleName = decision?.rule.name ?? null;
@@ -41,8 +96,9 @@ export function installFetchPatch(context: FetchPatchContext): void {
     if (decision === null || decision.plan.kind === 'passthrough') {
       try {
         const response = await nativeFetch.call(window, input as RequestInfo, init);
-        context.report({
+        const id = context.report({
           ...descriptor,
+          ...detail,
           transport: 'fetch',
           startedAt,
           durationMs: Date.now() - startedAt,
@@ -50,11 +106,18 @@ export function installFetchPatch(context: FetchPatchContext): void {
           status: response.status,
           ruleId,
           ruleName,
+          responseHeaders: headersToPairs(response.headers),
+        });
+        // Deliberately not awaited: the page gets its response now, and the
+        // body follows whenever the clone finishes reading.
+        void captureResponseBody(response).then((captured) => {
+          context.report.body(id, captured.body, captured.truncated);
         });
         return response;
       } catch (error) {
         context.report({
           ...descriptor,
+          ...detail,
           transport: 'fetch',
           startedAt,
           durationMs: Date.now() - startedAt,
@@ -70,9 +133,14 @@ export function installFetchPatch(context: FetchPatchContext): void {
     const signal = resolveAbortSignal(input, init);
     const plan = decision.plan;
 
-    const report = (outcome: 'mocked' | 'failed', status: number | null) => {
+    const report = (
+      outcome: 'mocked' | 'failed',
+      status: number | null,
+      responseHeaders: HeaderPair[] = [],
+    ) => {
       context.report({
         ...descriptor,
+        ...detail,
         transport: 'fetch',
         startedAt,
         durationMs: Date.now() - startedAt,
@@ -80,6 +148,9 @@ export function installFetchPatch(context: FetchPatchContext): void {
         status,
         ruleId,
         ruleName,
+        responseHeaders,
+        // We synthesized it, so there is nothing to read back.
+        responseBody: outcome === 'mocked' ? mockedBodyOf(plan) : null,
       });
     };
 
@@ -106,8 +177,18 @@ export function installFetchPatch(context: FetchPatchContext): void {
       throw error;
     }
 
-    report('mocked', plan.status);
-    return buildMockResponse(plan, descriptor.url);
+    // Reported at the head, not at the last chunk: `fetch` resolves as soon as
+    // the head arrives, and a stream set to repeat forever would otherwise
+    // never show up in the log at all.
+    if (plan.kind === 'stream') {
+      const streamed = buildStreamResponse(plan, descriptor.url, signal);
+      report('mocked', plan.status, headersToPairs(streamed.headers));
+      return streamed;
+    }
+
+    const mocked = buildMockResponse(plan, descriptor.url);
+    report('mocked', plan.status, headersToPairs(mocked.headers));
+    return mocked;
   };
 
   // Some libraries sniff for a patched fetch by stringifying it, then take a

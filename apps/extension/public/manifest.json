@@ -4,8 +4,13 @@
   "version": "0.1.0",
   "description": "Mock any browser request without touching your code.",
   "minimum_chrome_version": "111",
-  "permissions": ["storage"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -23,21 +28,46 @@
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "resources": [
+        "panel.css",
+        "icons/*",
+        "sandbox.html"
+      ]
+    }
+  ],
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["bridge.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "bridge.js"
+      ],
       "run_at": "document_start",
       "all_frames": true,
       "match_origin_as_fallback": true
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["injected.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "injected.js"
+      ],
       "run_at": "document_start",
       "all_frames": true,
       "world": "MAIN",
       "match_origin_as_fallback": true
     }
-  ]
+  ],
+  "sandbox": {
+    "pages": [
+      "sandbox.html"
+    ]
+  }
 }

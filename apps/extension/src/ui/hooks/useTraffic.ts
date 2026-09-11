@@ -1,23 +1,37 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { appendTraffic, type ExtensionEvent, type TrafficEntry } from '@mocksmith/core';
+import {
+  appendTraffic,
+  applyResponseBody,
+  type ExtensionEvent,
+  type TrafficEntry,
+} from '@mocksmith/core';
 
-import { clearTraffic, fetchTraffic } from '@/ui/lib/messaging';
+import { clearTraffic, fetchOwnTabId, fetchTraffic } from '@/ui/lib/messaging';
 
 export interface TrafficState {
   entries: TrafficEntry[];
+  /**
+   * The worker recorded traffic this session and then lost it to an MV3
+   * shutdown. The traffic panel says so rather than showing the same empty
+   * state it shows before anything has happened.
+   */
+  dropped: boolean;
   clear: () => void;
 }
 
 export function useTraffic(): TrafficState {
   const [entries, setEntries] = useState<TrafficEntry[]>([]);
+  const [dropped, setDropped] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     fetchTraffic()
-      .then((loaded) => {
-        if (!cancelled) setEntries(loaded);
+      .then((snapshot) => {
+        if (cancelled) return;
+        setEntries(snapshot.entries);
+        setDropped(snapshot.dropped);
       })
       .catch(() => {
         // An unreachable worker already surfaces through the config error state.
@@ -26,8 +40,21 @@ export function useTraffic(): TrafficState {
     const onEvent = (message: unknown) => {
       if (typeof message !== 'object' || message === null) return;
       const event = message as ExtensionEvent;
-      if (event.type !== 'traffic:added') return;
-      setEntries((current) => appendTraffic(current, event.entries));
+
+      if (event.type === 'traffic:added') {
+        // Fresh traffic answers the question the notice was asking.
+        setDropped(false);
+        setEntries((current) => appendTraffic(current, event.entries));
+        return;
+      }
+
+      // A body that arrived after its entry. The row does not move; the
+      // detail sheet simply gains a response.
+      if (event.type === 'traffic:body') {
+        setEntries(
+          (current) => applyResponseBody(current, event.id, event.body, event.truncated) ?? current,
+        );
+      }
     };
 
     chrome.runtime.onMessage.addListener(onEvent);
@@ -39,32 +66,46 @@ export function useTraffic(): TrafficState {
 
   const clear = useCallback(() => {
     setEntries([]);
+    setDropped(false);
     void clearTraffic();
   }, []);
 
-  return { entries, clear };
+  return { entries, dropped, clear };
 }
 
 /**
- * The tab behind the popup. Lets the traffic list default to "just this page",
- * which is almost always what you want while debugging one app.
+ * The tab this surface is about, so the traffic list can default to "just this
+ * page" -- almost always what you want while debugging one app.
+ *
+ * Each surface answers it differently. The popup floats over a tab and asks
+ * `chrome.tabs` which one. The floating panel *is* in a tab, but as a content
+ * script it has no `chrome.tabs` at all, so it asks the worker to read the
+ * message sender. The full tab view is about no page in particular.
  */
-export function useActiveTabId(enabled: boolean): number | null {
+export function useScopeTabId(view: 'popup' | 'tab' | 'panel'): number | null {
   const [tabId, setTabId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (view === 'tab') return;
     let cancelled = false;
 
-    void chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-      if (cancelled) return;
-      setTabId(tabs[0]?.id ?? null);
-    });
+    const resolve =
+      view === 'popup'
+        ? chrome.tabs.query({ active: true, currentWindow: true }).then((tabs) => tabs[0]?.id ?? null)
+        : fetchOwnTabId();
+
+    void resolve
+      .then((resolved) => {
+        if (!cancelled) setTabId(resolved);
+      })
+      .catch(() => {
+        // No scope is a working state: the strip simply speaks more generally.
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [view]);
 
   return tabId;
 }

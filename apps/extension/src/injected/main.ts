@@ -14,6 +14,7 @@ import {
 
 import { createConfigGate } from './config-gate.js';
 import { installFetchPatch } from './fetch-patch.js';
+import { createHandlerClient } from './handler-client.js';
 import { createReporter } from './reporter.js';
 import { installXhrPatch } from './xhr-patch.js';
 
@@ -56,16 +57,19 @@ function main(): void {
 
   const gate = createConfigGate(CONFIG_WAIT_TIMEOUT_MS);
   const report = createReporter();
+  const handlers = createHandlerClient();
 
   window.addEventListener('message', (event: MessageEvent) => {
     // Only messages this window posted to itself can be from our bridge.
     if (event.source !== window) return;
     if (!isBridgeToPageMessage(event.data)) return;
     gate.update(event.data.config);
+    // Arrives with the config because only the isolated world can look it up.
+    handlers.setSandboxUrl(event.data.sandboxUrl);
   });
 
-  installFetchPatch({ gate, report });
-  installXhrPatch({ gate, report });
+  installFetchPatch({ gate, report, handlers });
+  installXhrPatch({ gate, report, handlers });
 
   // The two content scripts race at document_start, so say hello in case the
   // bridge was ready before this listener existed.

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mocksmith handler sandbox</title>
+    <!--
+      Listed under `sandbox.pages` in the manifest, which is what makes
+      `new Function` legal here and nowhere else in the extension. It has no
+      access to any chrome.* API, which is the other half of that trade.
+
+      A classic script, not a module: this document has an opaque origin, and a
+      module fetch from one is subject to CORS even for the extension's own
+      files. Nothing is rendered -- it exists to run one function and answer.
+    -->
+    <script src="sandbox.js"></script>
+  </head>
+  <body></body>
+</html>

@@ -1,12 +1,20 @@
 import { z } from 'zod';
 
 import { CONFIG_VERSION, createDefaultConfig, type MocksmithConfig } from './config.js';
+import { CONDITION_OPERATORS, CONDITION_SOURCES } from './conditions.js';
+import {
+  DEFAULT_HANDLER_TIMEOUT_MS,
+  MAX_HANDLER_CODE_CHARS,
+  MAX_HANDLER_TIMEOUT_MS,
+} from './handler.js';
 import { HTTP_METHODS, METHOD_ANY } from './http.js';
 import { URL_MATCH_MODES, type RequestMatcher } from './matching.js';
-import { NETWORK_ERROR_TYPES, type MockRule, type RuleAction } from './rule.js';
+import { NETWORK_ERROR_TYPES, STREAM_FORMATS, type MockRule, type RuleAction } from './rule.js';
 
 /** Upper bound on a mock delay: 10 minutes is past any real client timeout. */
 const MAX_DELAY_MS = 600_000;
+/** Upper bound on stream repeats. 0 is the sentinel for "never stop". */
+const MAX_STREAM_REPEAT = 10_000;
 
 export const urlMatcherSchema = z.object({
   mode: z.enum(URL_MATCH_MODES),
@@ -16,9 +24,22 @@ export const urlMatcherSchema = z.object({
 
 export const methodPatternSchema = z.union([z.literal(METHOD_ANY), z.enum(HTTP_METHODS)]);
 
+export const ruleConditionSchema = z.object({
+  id: z.string().min(1),
+  source: z.enum(CONDITION_SOURCES),
+  key: z.string().default(''),
+  operator: z.enum(CONDITION_OPERATORS),
+  value: z.string().default(''),
+  caseSensitive: z.boolean().default(false),
+  enabled: z.boolean().default(true),
+});
+
 export const requestMatcherSchema = z.object({
   url: urlMatcherSchema,
   methods: z.array(methodPatternSchema).default([METHOD_ANY]),
+  // Defaulted, so every rule saved before conditions existed still loads.
+  conditions: z.array(ruleConditionSchema).default([]),
+  conditionMode: z.enum(['all', 'any']).default('all'),
 });
 
 export const responseBodySchema = z.discriminatedUnion('type', [
@@ -43,6 +64,38 @@ export const respondActionSchema = z.object({
   delayMs: z.number().int().min(0).max(MAX_DELAY_MS).default(0),
 });
 
+export const streamChunkSchema = z.object({
+  id: z.string().min(1),
+  value: z.string(),
+});
+
+export const streamActionSchema = z.object({
+  kind: z.literal('stream'),
+  status: z.number().int().min(200).max(599).default(200),
+  statusText: z.string().default(''),
+  headers: z.array(responseHeaderSchema).default([]),
+  format: z.enum(STREAM_FORMATS).default('sse'),
+  chunks: z.array(streamChunkSchema).default([]),
+  delayMs: z.number().int().min(0).max(MAX_DELAY_MS).default(0),
+  intervalMs: z.number().int().min(0).max(MAX_DELAY_MS).default(500),
+  repeat: z.number().int().min(0).max(MAX_STREAM_REPEAT).default(1),
+});
+
+export const handlerActionSchema = z.object({
+  kind: z.literal('handler'),
+  // Length-capped rather than parsed: whether it is valid JavaScript is the
+  // sandbox's problem, and a rule holding code that does not compile is a rule
+  // the user is still editing, not a rule that should be refused.
+  code: z.string().max(MAX_HANDLER_CODE_CHARS),
+  delayMs: z.number().int().min(0).max(MAX_DELAY_MS).default(0),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_HANDLER_TIMEOUT_MS)
+    .default(DEFAULT_HANDLER_TIMEOUT_MS),
+});
+
 export const networkErrorActionSchema = z.object({
   kind: z.literal('networkError'),
   errorType: z.enum(NETWORK_ERROR_TYPES),
@@ -55,6 +108,8 @@ export const passthroughActionSchema = z.object({
 
 export const ruleActionSchema = z.discriminatedUnion('kind', [
   respondActionSchema,
+  streamActionSchema,
+  handlerActionSchema,
   networkErrorActionSchema,
   passthroughActionSchema,
 ]);

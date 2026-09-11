@@ -18,8 +18,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Playwright downloads a Chrome for Testing here; the e2e job caches it.
+  # Playwright downloads a Chrome for Testing here; the e2e job caches it, and
+  # `scripts/lib/browser.mjs` reads this var when it goes looking for a binary.
   PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright
+  # Pinned, not `@latest`: the cache key below has to change when the browser
+  # does, or a stale build is restored forever.
+  PLAYWRIGHT_VERSION: 1.63.0
 
 jobs:
   static:
@@ -88,29 +92,32 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
-          key: chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: chromium-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}
       - name: Install Chrome for Testing
         if: steps.chrome-cache.outputs.cache-hit != 'true'
-        run: npx --yes playwright@latest install --with-deps chromium
+        run: npx --yes playwright@${{ env.PLAYWRIGHT_VERSION }} install --with-deps chromium
+      - name: Report the browser that will be used
+        run: node -e "const {findChromeForTesting}=await import('./apps/extension/scripts/lib/browser.mjs');console.log(findChromeForTesting()??'NONE FOUND')" --input-type=module
 
       - run: pnpm build
+
+      # One run, not two: it asserts and writes the screenshots at the same
+      # time. Running it twice doubled the slowest job, and the second run was
+      # allowed to fail -- which is how a broken browser install looked green.
+      #
       # Xvfb, because the extension is loaded into a real browser and headless
       # Chrome still wants a display for some of the panel work.
       - name: Run the playground headless
-        run: xvfb-run --auto-servernum pnpm e2e
-
-      # Screenshots of every surface in both themes. Worth keeping even on a
-      # green run: this is how a visual regression gets noticed at all.
-      - name: Capture the UI surfaces
-        if: always()
         env:
           E2E_SCREENSHOT_DIR: ${{ github.workspace }}/shots
         run: xvfb-run --auto-servernum pnpm e2e
-        continue-on-error: true
+
+      # Every surface in both themes. Worth keeping even on a green run: this is
+      # how a visual regression gets noticed at all.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ui-screenshots
           path: shots
-          if-no-files-found: ignore
+          if-no-files-found: warn
           retention-days: 14

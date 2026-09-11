@@ -39,15 +39,42 @@ function buildRank(name) {
   return match === null ? 0 : Number(match[1]);
 }
 
-export function findChromeForTesting() {
-  if (process.env.CHROME_PATH !== undefined) return process.env.CHROME_PATH;
+/**
+ * Where a cached browser might be.
+ *
+ * The env vars come first and matter more than they look: both tools use them
+ * to relocate their cache, and CI does exactly that so the download can be
+ * cached between runs. Searching only the default locations meant a browser
+ * that had just been installed successfully was reported as missing.
+ */
+function browserCacheRoots() {
+  const roots = [];
 
-  const roots = [
+  // Playwright's own override. `0` is its sentinel for "next to the package",
+  // not a directory, so it is not a path to search.
+  const playwright = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (playwright !== undefined && playwright !== '0' && playwright.length > 0) {
+    roots.push(playwright);
+  }
+
+  const puppeteer = process.env.PUPPETEER_CACHE_DIR;
+  if (puppeteer !== undefined && puppeteer.length > 0) {
+    roots.push(puppeteer, path.join(puppeteer, 'chrome'));
+  }
+
+  roots.push(
     path.join(homedir(), 'Library/Caches/ms-playwright'),
     path.join(homedir(), '.cache/ms-playwright'),
     path.join(homedir(), '.cache/puppeteer/chrome'),
     path.join(homedir(), 'Library/Caches/puppeteer/chrome'),
-  ];
+  );
+  return roots;
+}
+
+export function findChromeForTesting() {
+  if (process.env.CHROME_PATH !== undefined) return process.env.CHROME_PATH;
+
+  const roots = browserCacheRoots();
 
   const found = [];
   for (const root of roots) {
@@ -70,6 +97,11 @@ export function findChromeForTesting() {
   return found[0]?.executable ?? null;
 }
 
+/** The directories that were searched, for a failure message worth reading. */
+export function searchedBrowserRoots() {
+  return browserCacheRoots();
+}
+
 export const MISSING_CHROME_MESSAGE = [
   'No Chrome for Testing build found.',
   '',
@@ -81,6 +113,9 @@ export const MISSING_CHROME_MESSAGE = [
   '  npx @puppeteer/browsers install chrome@stable',
   '',
   'Or point CHROME_PATH at a Chrome for Testing, Canary or Dev binary.',
+  '',
+  'Looked in:',
+  ...browserCacheRoots().map((root) => `  ${root}`),
 ].join('\n');
 
 /* -------------------------------------------------------------------------- */

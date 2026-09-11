@@ -1,0 +1,23 @@
+{
+  "name": "@mocksmith/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Platform-agnostic matching and response-planning engine for mocksmith.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

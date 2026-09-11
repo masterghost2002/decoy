@@ -1,0 +1,23 @@
+{
+  "name": "mocksmith",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mock any browser request without touching your code.",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @mocksmith/extension dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "clean": "node -e \"for (const p of ['apps/extension/dist','packages/core/dist']) require('fs').rmSync(p,{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

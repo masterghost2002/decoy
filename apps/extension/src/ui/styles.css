@@ -1,0 +1,119 @@
+@import 'tailwindcss';
+
+/*
+ * Palette: slate neutrals with a single amber accent, matching the toolbar
+ * icon. Amber reads as "held / intercepted", which is what the tool does, and
+ * it keeps the surface from looking like every other generated dashboard.
+ *
+ * Light and dark both ship. A tool that lives next to devtools should follow
+ * the OS rather than force its own mood.
+ */
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-muted: #f8fafc;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --primary: #b45309;
+  --primary-foreground: #ffffff;
+  --accent: #fef3c7;
+  --accent-foreground: #78350f;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --ring: #f59e0b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1120;
+    --foreground: #e2e8f0;
+    --card: #111827;
+    --card-muted: #0f172a;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --border: #1e293b;
+    --border-strong: #334155;
+    --primary: #f59e0b;
+    --primary-foreground: #1c1917;
+    --accent: #422006;
+    --accent-foreground: #fcd34d;
+    --destructive: #f87171;
+    --destructive-foreground: #1c1917;
+    --success: #4ade80;
+    --ring: #f59e0b;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-muted: var(--card-muted);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-ring: var(--ring);
+
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The popup is a fixed viewport; the tab view fills whatever it gets. */
+  body[data-view='popup'] {
+    width: 420px;
+    height: 600px;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Slim scrollbars, since most panels here are dense scrolling lists. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--border-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+}

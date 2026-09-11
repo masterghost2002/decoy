@@ -220,7 +220,7 @@ export async function evaluate(cdp, sessionId, expression) {
   return result.value;
 }
 
-export async function waitForDebugger(debugPort, timeoutMs = 20_000) {
+export async function waitForDebugger(debugPort, timeoutMs = 20_000, diagnose) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -231,7 +231,13 @@ export async function waitForDebugger(debugPort, timeoutMs = 20_000) {
     }
     await sleep(200);
   }
-  throw new Error('Chrome never opened its debugging port');
+  // Whatever Chrome said on the way down. Without this the failure is a bare
+  // timeout, and the actual reason -- a missing library, a sandbox it is not
+  // allowed to create -- is in a stream nobody kept.
+  const said = diagnose?.() ?? '';
+  throw new Error(
+    `Chrome never opened its debugging port${said.length > 0 ? `\n\nChrome said:\n${said}` : ''}`,
+  );
 }
 
 /**
@@ -306,13 +312,42 @@ export async function launchWithExtension({
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-gpu',
+      // A CI container's /dev/shm is small enough that Chrome falls over
+      // allocating in it. Harmless everywhere else.
+      '--disable-dev-shm-usage',
+      /*
+       * Only under CI, and only because the sandbox cannot be created there:
+       * Ubuntu 24.04 blocks unprivileged user namespaces, which is what Chrome
+       * needs, so it exits before it ever opens the debugging port. This
+       * browser is throwaway -- it loads one extension we just built and one
+       * page we serve ourselves, and is destroyed with its profile at the end
+       * of the run.
+       */
+      ...(process.env.CI ? ['--no-sandbox'] : []),
       `--window-size=${windowSize}`,
       'about:blank',
     ],
-    { stdio: 'ignore' },
+    { stdio: ['ignore', 'ignore', 'pipe'] },
   );
 
-  const version = await waitForDebugger(debugPort);
+  /** The last of Chrome's stderr, kept only to explain a failure to start. */
+  const complaints = [];
+  chrome.stderr?.on('data', (chunk) => {
+    complaints.push(String(chunk));
+    if (complaints.length > 40) complaints.shift();
+  });
+  chrome.on('error', (error) => {
+    complaints.push(`spawn failed: ${error.message}`);
+  });
+
+  let version;
+  try {
+    version = await waitForDebugger(debugPort, 20_000, () => complaints.join('').trim());
+  } catch (error) {
+    chrome.kill();
+    await rm(userDataDir, { recursive: true, force: true, maxRetries: 5 }).catch(() => undefined);
+    throw error;
+  }
   const cdp = await Cdp.connect(version.webSocketDebuggerUrl);
   await cdp.send('Target.setDiscoverTargets', { discover: true });
 

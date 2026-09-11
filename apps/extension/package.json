@@ -11,6 +11,7 @@
     "dev": "pnpm clean && pnpm icons && node scripts/build.mjs --watch",
     "e2e": "node scripts/e2e.mjs",
     "icons": "node scripts/make-icons.mjs",
+    "playground": "node scripts/playground.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },

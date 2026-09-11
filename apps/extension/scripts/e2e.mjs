@@ -1,9 +1,13 @@
 /**
- * End-to-end check for the interceptor, driven over the Chrome DevTools
- * Protocol. Nothing about the extension is stubbed: it launches a real Chrome
- * with the built extension loaded, seeds a rule set through
- * `chrome.storage.local`, loads a fixture page over http, and runs the
- * behavioural scenarios in `fixtures/scenarios.js` inside that page.
+ * End-to-end check, driven over the Chrome DevTools Protocol. Nothing about the
+ * extension is stubbed: it launches a real Chrome with the built extension
+ * loaded, seeds the playground's rule set through `chrome.storage.local`,
+ * serves the playground over http, and runs every one of its cases inside that
+ * page -- then drives the extension's own UI and the floating panel.
+ *
+ * The behavioural half lives in `playground/`, not here, and that is
+ * deliberate: the same cases a person clicks through when something looks wrong
+ * are the ones CI runs, so there is only ever one definition of "working".
  *
  * Config is seeded by writing storage rather than through a test-only hook,
  * because the service worker already watches `chrome.storage.onChanged` for
@@ -14,542 +18,40 @@
  *
  * Env: CHROME_PATH to override the binary, E2E_HEADED=1 to watch it happen.
  */
-import { spawn } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { createServer } from 'node:http';
-import { homedir, tmpdir } from 'node:os';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const FIXTURES_DIR = fileURLToPath(new URL('../../../fixtures', import.meta.url));
+import { buildConfig, respond, rule, STORAGE_KEY } from '../../../playground/rules.mjs';
+import { startAltOriginServer, startPlaygroundServer } from '../../../playground/server.mjs';
+import {
+  attach,
+  evaluate,
+  launchWithExtension,
+  MISSING_CHROME_MESSAGE,
+  seedConfig,
+  sleep,
+} from './lib/browser.mjs';
+
 const DIST_DIR = fileURLToPath(new URL('../dist', import.meta.url));
-const STORAGE_KEY = 'mocksmith.config.v1';
 
 const DEBUG_PORT = Number(process.env.E2E_DEBUG_PORT ?? 9333);
 const PAGE_PORT = Number(process.env.E2E_PAGE_PORT ?? 4399);
+/* The second origin the cross-origin cases need. Below the page port, so a
+   playground left running on 4400/4401 does not collide with a test run. */
+const ALT_PORT = PAGE_PORT - 1;
 const HEADED = process.env.E2E_HEADED === '1';
 /** When set, the run also writes PNGs of each UI surface here for visual review. */
 const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR ?? null;
 /** `--paper` in both themes, as `getComputedStyle` reports it. */
 const PAPER_COLOURS = ['rgb(250, 250, 248)', 'rgb(19, 17, 16)'];
 
-/* -------------------------------------------------------------------------- */
-/* Browser discovery                                                          */
-/*                                                                            */
-/* Chrome 137+ ignores --load-extension on the stable channel, so a normal     */
-/* installed Chrome cannot run this. Chrome for Testing still honours it, and  */
-/* both Playwright and Puppeteer already cache one locally.                    */
-/* -------------------------------------------------------------------------- */
-
-const EXECUTABLE_SUFFIXES = [
-  'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
-  'chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
-  'chrome-mac/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
-  'chrome-linux64/chrome',
-  'chrome-linux/chrome',
-  'chrome-win64/chrome.exe',
-];
-
-/** Highest trailing number wins, so the newest cached build is preferred. */
-function buildRank(name) {
-  const match = /(\d+)(?!.*\d)/.exec(name);
-  return match === null ? 0 : Number(match[1]);
-}
-
-function findChromeForTesting() {
-  if (process.env.CHROME_PATH !== undefined) return process.env.CHROME_PATH;
-
-  const roots = [
-    path.join(homedir(), 'Library/Caches/ms-playwright'),
-    path.join(homedir(), '.cache/ms-playwright'),
-    path.join(homedir(), '.cache/puppeteer/chrome'),
-    path.join(homedir(), 'Library/Caches/puppeteer/chrome'),
-  ];
-
-  const found = [];
-  for (const root of roots) {
-    let entries;
-    try {
-      entries = readdirSync(root, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      for (const suffix of EXECUTABLE_SUFFIXES) {
-        const executable = path.join(root, entry.name, suffix);
-        if (existsSync(executable)) found.push({ name: entry.name, executable });
-      }
-    }
-  }
-
-  found.sort((left, right) => buildRank(right.name) - buildRank(left.name));
-  return found[0]?.executable ?? null;
-}
+/** The rule set under test: the playground's, in full. */
+const SEED_CONFIG = buildConfig({ port: PAGE_PORT, altPort: ALT_PORT });
 
 /* -------------------------------------------------------------------------- */
-/* The rule set under test                                                    */
+/* Screenshots                                                                */
 /* -------------------------------------------------------------------------- */
-
-function rule(id, name, urlValue, action, methods = ['*'], extra = {}) {
-  return {
-    id,
-    name,
-    enabled: true,
-    matcher: {
-      url: { mode: extra.mode ?? 'contains', value: urlValue, caseSensitive: false },
-      methods,
-      conditions: extra.conditions ?? [],
-      conditionMode: extra.conditionMode ?? 'all',
-    },
-    action,
-    createdAt: 0,
-    updatedAt: 0,
-  };
-}
-
-function condition(source, key, operator, value = '') {
-  return {
-    id: `cond_${source}_${key || 'body'}`,
-    source,
-    key,
-    operator,
-    value,
-    caseSensitive: false,
-    enabled: true,
-  };
-}
-
-function respond(status, body) {
-  return {
-    kind: 'respond',
-    status,
-    statusText: '',
-    headers: [],
-    body: { type: 'json', value: body },
-    delayMs: 0,
-  };
-}
-
-function stream(format, values, { intervalMs = 30, repeat = 1, status = 200 } = {}) {
-  return {
-    kind: 'stream',
-    status,
-    statusText: '',
-    headers: [],
-    format,
-    chunks: values.map((value, index) => ({ id: `chunk_${String(index)}`, value })),
-    delayMs: 0,
-    intervalMs,
-    repeat,
-  };
-}
-
-/**
- * Written as an indented template literal for readability here, and dedented
- * before it is stored: a rule seeded with eight spaces of leading whitespace on
- * every line is not what anyone would have typed.
- */
-function handler(source, { timeoutMs = 2000, delayMs = 0 } = {}) {
-  const lines = source.replace(/^\n/, '').replace(/\s+$/, '').split('\n');
-  const indents = lines
-    .filter((line) => line.trim().length > 0)
-    .map((line) => (/^\s*/.exec(line) ?? [''])[0].length);
-  const strip = indents.length === 0 ? 0 : Math.min(...indents);
-  const code = lines.map((line) => line.slice(strip)).join('\n');
-  return { kind: 'handler', code, delayMs, timeoutMs };
-}
-
-const SEED_CONFIG = {
-  version: 1,
-  enabled: true,
-  rules: [
-    // Deliberately first, to prove a narrow passthrough shadows a broad mock.
-    rule('rule_passthrough', 'Keep /api/users/me real', '/api/users/me', { kind: 'passthrough' }),
-    // Middleware, expressed with the priority model that already exists: a
-    // handler above the rule it guards, declining with next() when it does not
-    // want the call. This is what makes collections unnecessary for the common
-    // case -- position already means precedence.
-    rule(
-      'rule_h_gate',
-      'Gate users by query',
-      '/api/users',
-      handler(`
-        if (req.query.vip !== '1') return next();
-        return { via: 'handler', vip: true };
-      `),
-    ),
-    rule('rule_users404', 'Users 404', '/api/users', {
-      kind: 'respond',
-      status: 404,
-      statusText: '',
-      headers: [{ name: 'X-Mocked', value: 'yes' }],
-      body: { type: 'json', value: '{"error":{"code":"NOT_FOUND","message":"No such user"}}' },
-      delayMs: 0,
-    }),
-    rule('rule_slow', 'Slow endpoint', '/api/slow', {
-      kind: 'respond',
-      status: 200,
-      statusText: '',
-      headers: [],
-      body: { type: 'json', value: '{"ok":true}' },
-      delayMs: 1500,
-    }),
-    rule('rule_boom', 'Boom', '/api/boom', {
-      kind: 'networkError',
-      errorType: 'failed',
-      delayMs: 0,
-    }),
-    rule('rule_hang', 'Hang', '/api/hang', {
-      kind: 'networkError',
-      errorType: 'timeout',
-      delayMs: 0,
-    }),
-    rule('rule_empty', 'No content', '/api/empty', {
-      kind: 'respond',
-      status: 204,
-      statusText: '',
-      headers: [],
-      // Deliberately non-empty: a 204 must drop it rather than throw.
-      body: { type: 'json', value: '{"ignored":true}' },
-      delayMs: 0,
-    }),
-
-    /* -- conditions: the rule only takes the call when the request says so -- */
-
-    // Payload-gated: only the admin POST is intercepted, everyone else is real.
-    rule('rule_admin', 'Block admin writes', '/api/profile', respond(403, '{"error":"admin"}'), ['POST'], {
-      conditions: [condition('jsonPath', 'user.role', 'equals', 'admin')],
-    }),
-    // Header-gated.
-    rule('rule_authed', 'Authed only', '/api/secure', respond(200, '{"scope":"full"}'), ['*'], {
-      conditions: [condition('header', 'authorization', 'startsWith', 'Bearer ')],
-    }),
-    // Cookie-gated.
-    rule('rule_cookie', 'Staging cookie', '/api/flag', respond(200, '{"flag":"staging"}'), ['*'], {
-      conditions: [condition('cookie', 'mode', 'equals', 'staging')],
-    }),
-    // Query-gated, combined with a header, in `any` mode.
-    rule('rule_any', 'Either signal', '/api/either', respond(200, '{"via":"any"}'), ['*'], {
-      conditionMode: 'any',
-      conditions: [
-        condition('query', 'debug', 'equals', '1'),
-        condition('header', 'x-debug', 'exists'),
-      ],
-    }),
-    /* -- streams: a body that arrives in pieces rather than all at once -- */
-
-    rule(
-      'rule_sse',
-      'Server-sent events',
-      '/api/events',
-      stream('sse', ['{"n":1}', '{"n":2}', '[DONE]']),
-    ),
-    // Deliberately pretty-printed, to prove ndjson compacts each record onto
-    // the one line the format requires.
-    rule(
-      'rule_ndjson',
-      'Newline-delimited json',
-      '/api/ndjson',
-      stream('ndjson', ['{"a": 1}', '{\n  "b": 2\n}'], { intervalMs: 20, repeat: 2 }),
-    ),
-    // Repeat 0: never closes on its own, the way a real event source does not.
-    rule(
-      'rule_forever',
-      'Endless event source',
-      '/api/forever',
-      stream('sse', ['{"tick":1}'], { intervalMs: 25, repeat: 0 }),
-    ),
-
-    /* -- handlers: the answer is a function of the request -- */
-
-    // Everything `req` carries, echoed back, so one assertion covers the whole
-    // context the handler is given.
-    rule(
-      'rule_h_echo',
-      'Echo the request',
-      '/api/h/echo',
-      handler(`
-        return res.status(201).set('X-From', 'handler').json({
-          method: req.method,
-          path: req.path,
-          host: req.host,
-          page: req.query.page,
-          repeated: req.queryAll.tag,
-          auth: req.headers.authorization ?? null,
-          cookie: req.cookies.mode ?? null,
-          sent: req.body === null ? null : JSON.parse(req.body).note,
-          transport: req.transport,
-        });
-      `),
-    ),
-
-    // Counts its own calls, which is the case no declarative rule can express.
-    rule(
-      'rule_h_store',
-      'Third call fails',
-      '/api/h/flaky',
-      handler(`
-        store.calls = (store.calls ?? 0) + 1;
-        if (store.calls === 3) return res.status(503).json({ attempt: store.calls, down: true });
-        return { attempt: store.calls, down: false };
-      `),
-    ),
-
-    // A named group in the pattern, read back as req.params -- an Express route
-    // in everything but spelling.
-    rule(
-      'rule_h_params',
-      'Route parameters',
-      '/api/h/users/(?<id>\\d+)/posts/(?<postId>\\d+)',
-      handler(`return { id: req.params.id, postId: req.params.postId };`),
-      ['*'],
-      { mode: 'regex' },
-    ),
-
-    // A stream, produced by code rather than by a chunk list.
-    rule(
-      'rule_h_stream',
-      'Streamed by a handler',
-      '/api/h/stream',
-      handler(`
-        const rows = [1, 2, 3].map((n) => ({ n, of: 3 }));
-        return res.stream(rows, { format: 'ndjson', every: 20 });
-      `),
-    ),
-
-    // Throws on purpose. The request must not reach the real network.
-    rule(
-      'rule_h_throws',
-      'Handler that throws',
-      '/api/h/throws',
-      handler(`return nope.notDefined;`),
-    ),
-
-    // Never settles, with a short leash, so the timeout is observable.
-    rule(
-      'rule_h_hangs',
-      'Handler that hangs',
-      '/api/h/hangs',
-      handler(`return new Promise(() => {});`, { timeoutMs: 300 }),
-    ),
-
-    // Answers an XHR, which reaches the sandbox by a different road.
-    rule(
-      'rule_h_xhr',
-      'Handler over xhr',
-      '/api/h/xhr',
-      handler(`return { via: 'handler', transport: req.transport };`),
-    ),
-
-    // A full url including the host, in an anchored mode, written the way the
-    // traffic panel displays it -- scheme omitted.
-    rule('rule_fullurl', 'Full url with domain', `127.0.0.1:${String(PAGE_PORT)}/api/whoami`, respond(200, '{"who":"mocked"}'), ['*'], {
-      mode: 'startsWith',
-    }),
-  ],
-};
-
-/* -------------------------------------------------------------------------- */
-/* Fixture server                                                             */
-/* -------------------------------------------------------------------------- */
-
-const API_RESPONSES = {
-  '/api/users/me': { real: true },
-  '/api/ping': { pong: true },
-};
-
-const CONTENT_TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript' };
-
-function startFixtureServer() {
-  const server = createServer((request, response) => {
-    const url = new URL(request.url ?? '/', `http://127.0.0.1:${String(PAGE_PORT)}`);
-
-    if (url.pathname.startsWith('/api/')) {
-      const body = API_RESPONSES[url.pathname] ?? { server: true, path: url.pathname };
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify(body));
-      return;
-    }
-
-    const name = url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\/+/, '');
-    readFile(path.join(FIXTURES_DIR, name))
-      .then((file) => {
-        response.writeHead(200, {
-          'content-type': CONTENT_TYPES[path.extname(name)] ?? 'application/octet-stream',
-          /*
-           * Deliberately hostile, and the reason handlers are architected the
-           * way they are. No `unsafe-eval`, so building a function from a
-           * string is impossible in this page; `frame-src 'self'`, so the page
-           * cannot iframe anything either. A hardened app looks like this, and
-           * Decoy has to work inside one -- the sandbox is an extension
-           * frame, which neither directive reaches.
-           */
-          'content-security-policy':
-            "default-src 'self'; script-src 'self'; frame-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'",
-        });
-        response.end(file);
-      })
-      .catch(() => {
-        response.writeHead(404).end('not found');
-      });
-  });
-
-  return new Promise((resolve) => {
-    server.listen(PAGE_PORT, '127.0.0.1', () => {
-      resolve(server);
-    });
-  });
-}
-
-/* -------------------------------------------------------------------------- */
-/* Minimal CDP client                                                         */
-/* -------------------------------------------------------------------------- */
-
-class Cdp {
-  #socket;
-  #nextId = 1;
-  #pending = new Map();
-  #listeners = new Set();
-
-  constructor(socket) {
-    this.#socket = socket;
-    socket.addEventListener('message', (event) => {
-      const message = JSON.parse(String(event.data));
-      if (message.id !== undefined) {
-        const entry = this.#pending.get(message.id);
-        if (entry === undefined) return;
-        this.#pending.delete(message.id);
-        if (message.error) entry.reject(new Error(`${message.error.message} (${message.method})`));
-        else entry.resolve(message.result);
-        return;
-      }
-      for (const listener of this.#listeners) listener(message);
-    });
-  }
-
-  static async connect(url) {
-    const socket = new WebSocket(url);
-    await new Promise((resolve, reject) => {
-      socket.addEventListener('open', resolve, { once: true });
-      socket.addEventListener('error', () => {
-        reject(new Error(`Could not open a CDP socket at ${url}`));
-      }, { once: true });
-    });
-    return new Cdp(socket);
-  }
-
-  send(method, params = {}, sessionId) {
-    const id = this.#nextId++;
-    const payload = { id, method, params };
-    if (sessionId !== undefined) payload.sessionId = sessionId;
-
-    return new Promise((resolve, reject) => {
-      this.#pending.set(id, { resolve, reject, method });
-      this.#socket.send(JSON.stringify(payload));
-    });
-  }
-
-  /** Resolves on the first matching event, or rejects after `timeoutMs`. */
-  waitForEvent(method, sessionId, timeoutMs = 30_000) {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.#listeners.delete(listener);
-        reject(new Error(`Timed out waiting for ${method}`));
-      }, timeoutMs);
-
-      const listener = (message) => {
-        if (message.method !== method) return;
-        if (sessionId !== undefined && message.sessionId !== sessionId) return;
-        clearTimeout(timer);
-        this.#listeners.delete(listener);
-        resolve(message.params);
-      };
-      this.#listeners.add(listener);
-    });
-  }
-
-  close() {
-    this.#socket.close();
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/* Helpers                                                                    */
-/* -------------------------------------------------------------------------- */
-
-const sleep = (ms) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
-async function waitForDebugger(timeoutMs = 20_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(`http://127.0.0.1:${String(DEBUG_PORT)}/json/version`);
-      if (response.ok) return await response.json();
-    } catch {
-      // Chrome is still starting up.
-    }
-    await sleep(200);
-  }
-  throw new Error('Chrome never opened its debugging port');
-}
-
-/**
- * Chrome ships component extensions with their own workers, so the candidate is
- * confirmed by asking it for its manifest name rather than by guessing from the
- * script filename.
- */
-async function findServiceWorker(cdp, timeoutMs = 25_000) {
-  const deadline = Date.now() + timeoutMs;
-  let seen = [];
-
-  while (Date.now() < deadline) {
-    const { targetInfos } = await cdp.send('Target.getTargets', { filter: [{}] });
-    const workers = targetInfos.filter((info) => info.type === 'service_worker');
-    seen = workers.map((info) => info.url);
-
-    for (const worker of workers) {
-      const sessionId = await attach(cdp, worker.targetId);
-      await cdp.send('Runtime.enable', {}, sessionId);
-      let name = null;
-      try {
-        name = await evaluate(cdp, sessionId, 'chrome.runtime.getManifest().name');
-      } catch {
-        // Not an extension worker, or not ready yet.
-      }
-      if (name === 'Decoy') return { worker, sessionId };
-      await cdp.send('Target.detachFromTarget', { sessionId });
-    }
-    await sleep(250);
-  }
-
-  throw new Error(
-    `The Decoy service worker never appeared as a CDP target.\nService workers seen: ${
-      seen.length > 0 ? seen.join(', ') : 'none'
-    }`,
-  );
-}
-
-async function evaluate(cdp, sessionId, expression) {
-  const { result, exceptionDetails } = await cdp.send(
-    'Runtime.evaluate',
-    { expression, awaitPromise: true, returnByValue: true },
-    sessionId,
-  );
-  if (exceptionDetails !== undefined) {
-    throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text);
-  }
-  return result.value;
-}
-
-async function attach(cdp, targetId) {
-  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-  return sessionId;
-}
 
 async function captureSurfaces(cdp, sessionId, extensionId) {
   if (SCREENSHOT_DIR === null) return;
@@ -800,85 +302,36 @@ async function captureSurfaces(cdp, sessionId, extensionId) {
 /* -------------------------------------------------------------------------- */
 
 async function main() {
-  const chromePath = findChromeForTesting();
-  if (chromePath === null) {
-    console.error(
-      [
-        'No Chrome for Testing build found.',
-        '',
-        'Chrome 137+ ignores --load-extension on the stable channel, so an installed',
-        'Chrome cannot load an unpacked extension from the command line. Install a',
-        'testing build with either of these, then re-run:',
-        '',
-        '  npx playwright install chromium',
-        '  npx @puppeteer/browsers install chrome@stable',
-        '',
-        'Or point CHROME_PATH at a Chrome for Testing, Canary or Dev binary.',
-      ].join('\n'),
-    );
-    process.exit(2);
+  const servers = [
+    await startPlaygroundServer({ port: PAGE_PORT, altPort: ALT_PORT }),
+    await startAltOriginServer({ port: ALT_PORT }),
+  ];
+
+  let session;
+  try {
+    session = await launchWithExtension({
+      distDir: DIST_DIR,
+      debugPort: DEBUG_PORT,
+      headed: HEADED,
+    });
+  } catch (error) {
+    for (const server of servers) server.close();
+    if (error.code === 'NO_CHROME') {
+      console.error(MISSING_CHROME_MESSAGE);
+      process.exit(2);
+    }
+    throw error;
   }
-  console.log(`browser: ${chromePath}`);
 
-  const server = await startFixtureServer();
-  const userDataDir = await mkdtemp(path.join(tmpdir(), 'decoy-e2e-'));
+  const { cdp, workerSession, extensionId } = session;
+  console.log(`browser: ${session.chromePath}`);
+  console.log(`extension id: ${extensionId}`);
 
-  const chrome = spawn(
-    chromePath,
-    [
-      ...(HEADED ? [] : ['--headless=new']),
-      `--remote-debugging-port=${String(DEBUG_PORT)}`,
-      `--user-data-dir=${userDataDir}`,
-      `--disable-extensions-except=${DIST_DIR}`,
-      `--load-extension=${DIST_DIR}`,
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-gpu',
-      '--window-size=1280,900',
-      'about:blank',
-    ],
-    { stdio: 'ignore' },
-  );
-
-  let cdp;
   let failures = 0;
 
   try {
-    const version = await waitForDebugger();
-    cdp = await Cdp.connect(version.webSocketDebuggerUrl);
-    await cdp.send('Target.setDiscoverTargets', { discover: true });
-
-    const { worker, sessionId: workerSession } = await findServiceWorker(cdp);
-    const extensionId = new URL(worker.url).host;
-    console.log(`extension id: ${extensionId}`);
-
-    /* Wait for the worker's own first-run seeding to land before overwriting
-       it, or the two writes race and the winner is whichever finished last. */
-    const readyDeadline = Date.now() + 10_000;
-    for (;;) {
-      const stored = await evaluate(
-        cdp,
-        workerSession,
-        `(async () => {
-           const bag = await chrome.storage.local.get(${JSON.stringify(STORAGE_KEY)});
-           return bag[${JSON.stringify(STORAGE_KEY)}] === undefined ? 'empty' : 'present';
-         })()`,
-      );
-      if (stored === 'present' || Date.now() > readyDeadline) break;
-      await sleep(150);
-    }
-
-    const seeded = await evaluate(
-      cdp,
-      workerSession,
-      `(async () => {
-         await chrome.storage.local.set({ ${JSON.stringify(STORAGE_KEY)}: ${JSON.stringify(SEED_CONFIG)} });
-         return 'seeded';
-       })()`,
-    );
-    console.log(`config: ${seeded} (${String(SEED_CONFIG.rules.length)} rules)`);
-    // Let the worker's storage listener fan the change out before any page loads.
-    await sleep(300);
+    const seeded = await seedConfig(cdp, workerSession, STORAGE_KEY, SEED_CONFIG);
+    console.log(`config: seeded (${String(seeded)} rules)`);
 
     const { targetId: pageTargetId } = await cdp.send('Target.createTarget', {
       url: 'about:blank',
@@ -888,14 +341,51 @@ async function main() {
     await cdp.send('Runtime.enable', {}, pageSession);
 
     const loaded = cdp.waitForEvent('Page.loadEventFired', pageSession);
-    await cdp.send(
-      'Page.navigate',
-      { url: `http://127.0.0.1:${String(PAGE_PORT)}/` },
-      pageSession,
-    );
+    await cdp.send('Page.navigate', { url: `http://127.0.0.1:${String(PAGE_PORT)}/` }, pageSession);
     await loaded;
 
-    const results = await evaluate(cdp, pageSession, 'window.__decoy.runAll()');
+    /*
+     * Started and then polled, rather than awaited in one evaluation. The
+     * playground makes several hundred requests and takes the better part of a
+     * minute; a single `Runtime.evaluate` with `awaitPromise` held open that
+     * long gets its promise collected out from under it, and the run dies with
+     * "Promise was collected" rather than a result.
+     */
+    await evaluate(
+      cdp,
+      pageSession,
+      `(() => {
+         window.__e2e = { done: false, results: null };
+         window.__decoy.runAll().then(
+           (results) => {
+             window.__e2e = { done: true, results };
+           },
+           (error) => {
+             window.__e2e = {
+               done: true,
+               results: [{ name: 'playground: runAll', ok: false, status: 'fail', detail: String(error), ms: 0 }],
+             };
+           },
+         );
+         return 'started';
+       })()`,
+    );
+
+    let results = null;
+    const runDeadline = Date.now() + 300_000;
+    while (Date.now() < runDeadline) {
+      const snapshot = await evaluate(
+        cdp,
+        pageSession,
+        'window.__e2e.done ? window.__e2e.results : null',
+      );
+      if (snapshot !== null) {
+        results = snapshot;
+        break;
+      }
+      await sleep(500);
+    }
+    if (results === null) throw new Error('the playground never finished its run');
 
     console.log('');
     for (const result of results) {
@@ -1613,7 +1103,7 @@ async function main() {
           fileLoad.toast.includes('capture.ndjson') &&
           fileLoad.toast.includes('Undo'),
       ],
-      ['ui: the handler editor shows the rule\'s code', handlerEditor.showsCode === true],
+      ["ui: the handler editor shows the rule's code", handlerEditor.showsCode === true],
       [
         `ui: the action picker marks Handler as selected (${JSON.stringify(handlerEditor.pressed)})`,
         JSON.stringify(handlerEditor.pressed) === '["Handler"]',
@@ -1664,11 +1154,20 @@ async function main() {
       ],
       ['ui: New rule creates one and opens it', lifecycle.created === true],
       ['ui: a named, patterned rule saves', lifecycle.saved === true],
-      ['ui: duplicating lands below the original and starts disabled', lifecycle.duplicated === true],
-      ['ui: move to top actually reorders, which is the priority model', lifecycle.movedToTop === true],
+      [
+        'ui: duplicating lands below the original and starts disabled',
+        lifecycle.duplicated === true,
+      ],
+      [
+        'ui: move to top actually reorders, which is the priority model',
+        lifecycle.movedToTop === true,
+      ],
       ['ui: deleting the duplicate leaves the original alone', lifecycle.copyGone === true],
       ['ui: the list switch disables a rule', lifecycle.disabled === true],
-      ['ui: deleting removes it, and undo brings it back', lifecycle.deleted === true && lifecycle.restored === true],
+      [
+        'ui: deleting removes it, and undo brings it back',
+        lifecycle.deleted === true && lifecycle.restored === true,
+      ],
       ['ui: the master switch pauses everything and says so', lifecycle.paused === true],
       ['panel: mounts a shadow root into the page', panel.mounted === true],
       [
@@ -1707,7 +1206,10 @@ async function main() {
         `panel: Mock this opens the new rule in the panel (${String(panelWrote.lastName)})`,
         panelTraffic.showsNewRule === true,
       ],
-      ['panel: collapses to a launcher at the edge of the page', panelCollapse.frameHidden === true && panelCollapse.launcherShown === true],
+      [
+        'panel: collapses to a launcher at the edge of the page',
+        panelCollapse.frameHidden === true && panelCollapse.launcherShown === true,
+      ],
       ['panel: the launcher is actually reachable', panelCollapse.launcherOnScreen === true],
       [
         'panel: expanding restores the same panel, not a new one',
@@ -1726,12 +1228,8 @@ async function main() {
     console.log('');
     console.log(`${String(total - failures)}/${String(total)} checks passed`);
   } finally {
-    cdp?.close();
-    chrome.kill();
-    server.close();
-    // Chrome can still be releasing file handles as it exits.
-    await sleep(300);
-    await rm(userDataDir, { recursive: true, force: true, maxRetries: 5 }).catch(() => undefined);
+    for (const server of servers) server.close();
+    await session.close();
   }
 
   process.exit(failures === 0 ? 0 : 1);

@@ -7,17 +7,46 @@
   "scripts": {
     "build": "pnpm -r build",
     "dev": "pnpm --filter @mocksmith/extension dev",
+    "playground": "pnpm --filter @mocksmith/extension playground",
+    "e2e": "pnpm --filter @mocksmith/extension e2e",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "contrast": "pnpm --filter @mocksmith/extension contrast",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "clean": "node -e \"for (const p of ['apps/extension/dist','packages/core/dist']) require('fs').rmSync(p,{recursive:true,force:true})\""
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^6.1.1",
+    "eslint-plugin-react-refresh": "^0.5.6",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.6",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.0",
     "vitest": "^3.2.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
     ]
+  },
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/masterghost2002/decoy.git"
+  },
+  "homepage": "https://github.com/masterghost2002/decoy#readme",
+  "bugs": {
+    "url": "https://github.com/masterghost2002/decoy/issues"
   }
 }

@@ -95,12 +95,12 @@ const WATERLINE = 0.68;
  */
 function insideBody(x, y) {
   if (y > WATERLINE) return false;
-  if (ellipse(x, y, 0.51, 0.60, 0.30, 0.20)) return true;
+  if (ellipse(x, y, 0.51, 0.6, 0.3, 0.2)) return true;
 
-  const t = (x - 0.70) / 0.22;
+  const t = (x - 0.7) / 0.22;
   if (t >= 0 && t <= 1) {
-    const top = 0.60 - 0.20 * (1 - t) - 0.115 * t;
-    return y >= top && y <= 0.60 + 0.08 * (1 - t);
+    const top = 0.6 - 0.2 * (1 - t) - 0.115 * t;
+    return y >= top && y <= 0.6 + 0.08 * (1 - t);
   }
   return false;
 }
@@ -108,7 +108,7 @@ function insideBody(x, y) {
 /** Head and neck, merged into the hull so the whole bird is one shape. */
 function insideHead(x, y) {
   if (ellipse(x, y, 0.345, 0.335, 0.145, 0.145)) return true;
-  return x >= 0.27 && x <= 0.44 && y >= 0.32 && y <= 0.60;
+  return x >= 0.27 && x <= 0.44 && y >= 0.32 && y <= 0.6;
 }
 
 /** A short wedge, kept blunt: a fine point disappears below 32px. */
@@ -138,7 +138,7 @@ function insideEye(x, y, size) {
 function insideWater(x, y, size) {
   if (size < 24) return false;
   if (Math.abs(y - (WATERLINE + 0.085)) > 0.045) return false;
-  return (x >= 0.13 && x <= 0.40) || (x >= 0.48 && x <= 0.87);
+  return (x >= 0.13 && x <= 0.4) || (x >= 0.48 && x <= 0.87);
 }
 
 /** 4x4 supersampling, which is enough to keep the 16px tile from looking ragged. */

@@ -59,9 +59,7 @@ function channelLuminance(channel) {
 }
 
 function luminance([r, g, b]) {
-  return (
-    0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b)
-  );
+  return 0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b);
 }
 
 function contrast(foreground, background) {
@@ -170,7 +168,13 @@ function main() {
         checked += 1;
         const ratio = contrast(resolve(tokens, token, surface), parseHex(tokens[surface]));
         if (ratio < TEXT_FLOOR) {
-          failures.push({ theme: theme.name, pair: `${token} on ${surface}`, ratio, floor: TEXT_FLOOR, note });
+          failures.push({
+            theme: theme.name,
+            pair: `${token} on ${surface}`,
+            ratio,
+            floor: TEXT_FLOOR,
+            note,
+          });
         }
       }
     }
@@ -188,7 +192,13 @@ function main() {
         checked += 1;
         const ratio = contrast(resolve(tokens, token, surface), parseHex(tokens[surface]));
         if (ratio < UI_FLOOR) {
-          failures.push({ theme: theme.name, pair: `${token} on ${surface}`, ratio, floor: UI_FLOOR, note });
+          failures.push({
+            theme: theme.name,
+            pair: `${token} on ${surface}`,
+            ratio,
+            floor: UI_FLOOR,
+            note,
+          });
         }
       }
     }

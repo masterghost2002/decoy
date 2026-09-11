@@ -48,13 +48,31 @@ const EXPORT_DEFAULT = /^export\s+default\s+/;
 const MODULE_EXPORTS = /^module\.exports\s*=\s*/;
 
 /**
+ * `new Function` builds a synchronous function, and a handler body that starts
+ * with `await` is the most ordinary thing anyone will write. The AsyncFunction
+ * constructor is not a global, but it is reachable from any async function, and
+ * it compiles the identical source into something that can await.
+ *
+ * Nothing downstream changes: the caller already has to handle a returned
+ * promise, because the arrow and `export default async` forms return one too.
+ */
+const AsyncFunction = (
+  Object.getPrototypeOf(async function placeholder() {
+    /* nothing */
+  }) as { constructor: new (...args: string[]) => CompiledHandler }
+).constructor;
+
+/**
  * Compiles the source into something callable, or explains why it will not
  * compile in a sentence that names the problem.
  *
  * `new Function` is the only tool available: the page has no module loader we
  * can reach, and this is a sandboxed document precisely so that building a
  * function from a string is permitted here and nowhere else in the extension.
+ * Which is also why the implied-eval rule is switched off for this one file --
+ * turning a string into a function is the feature, not an accident.
  */
+/* eslint-disable @typescript-eslint/no-implied-eval */
 export function compileHandler(code: string): CompileResult {
   const source = code.trim();
   if (source.length === 0) {
@@ -63,7 +81,14 @@ export function compileHandler(code: string): CompileResult {
 
   // A module-ish preamble is stripped rather than rejected; what follows it is
   // the function the user meant to write either way.
-  const stripped = source.replace(EXPORT_DEFAULT, '').replace(MODULE_EXPORTS, '').trim();
+  const stripped = source
+    .replace(EXPORT_DEFAULT, '')
+    .replace(MODULE_EXPORTS, '')
+    .trim()
+    // `module.exports = function () {};` is what people paste, and the
+    // semicolon that terminated the assignment is a syntax error once the
+    // remainder is wrapped in parentheses.
+    .replace(/;+$/, '');
   const asExpression = looksLikeFunctionExpression(stripped);
 
   try {
@@ -86,7 +111,7 @@ export function compileHandler(code: string): CompileResult {
       };
     }
 
-    const run = new Function(...HANDLER_ARGS, `"use strict";\n${source}`) as CompiledHandler;
+    const run = new AsyncFunction(...HANDLER_ARGS, `"use strict";\n${source}`);
     return { ok: true, run };
   } catch (error) {
     return { ok: false, message: describe(error) };
@@ -99,7 +124,7 @@ export function describe(error: unknown): string {
     return `${name}: ${error.message}`;
   }
   // A handler is free to `throw 'nope'`, and the log still has to say something.
-  return typeof error === 'string' ? error : JSON.stringify(error) ?? String(error);
+  return typeof error === 'string' ? error : (JSON.stringify(error) ?? String(error));
 }
 
 /**
@@ -113,10 +138,19 @@ export function formatLogArgument(value: unknown): string {
   if (typeof value === 'function') return `[function ${value.name || 'anonymous'}]`;
   if (typeof value === 'undefined') return 'undefined';
   try {
-    return JSON.stringify(value, replaceCircular(), 2) ?? String(value);
+    return JSON.stringify(value, replaceCircular(), 2) ?? describeShape(value);
   } catch {
-    return String(value);
+    return describeShape(value);
   }
+}
+
+/**
+ * The last resort for a value json refuses. `String(value)` would print
+ * `[object Object]`, which tells the reader nothing; the tag at least names the
+ * kind of thing it was.
+ */
+function describeShape(value: unknown): string {
+  return Object.prototype.toString.call(value);
 }
 
 /** Keeps a cyclic object from turning a stray `console.log` into a crash. */

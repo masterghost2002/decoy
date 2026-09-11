@@ -1,6 +1,13 @@
 # Decoy
 
-Mock any browser request without touching your code.
+**Mock any browser request without touching your code.**
+
+[![CI](https://github.com/masterghost2002/decoy/actions/workflows/ci.yml/badge.svg)](https://github.com/masterghost2002/decoy/actions/workflows/ci.yml)
+[![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-1a1714)](https://developer.chrome.com/docs/extensions/mv3/intro/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-1a1714)](https://www.typescriptlang.org/)
+[![tests](https://img.shields.io/badge/tests-211%20unit%20%2B%20242%20e2e-2f7d47)](#testing)
+
+![The Decoy workspace: a rule list, a rule editor and a live preview](docs/screenshots/workspace-light.png)
 
 Front-end work stalls in two places: waiting for an endpoint that is not deployed yet, and
 reproducing the failure cases — a 404, a 500, a 30-second response, a dropped connection. Today
@@ -15,16 +22,26 @@ not built — see [Roadmap](#roadmap).
 ## Quick start
 
 ```bash
+git clone https://github.com/masterghost2002/decoy.git
+cd decoy
 pnpm install
-pnpm --filter @mocksmith/extension build
+pnpm build
 ```
 
 Then in Chrome: `chrome://extensions` → enable **Developer mode** → **Load unpacked** →
 select `apps/extension/dist`.
 
-Click the toolbar icon for the popup, or the ↗ button in the popup for the full-page view.
+Click the toolbar icon for the popup, or the ⧉ button in it for the full-page view.
 During development, `pnpm dev` rebuilds on save; press reload on the extensions page to pick the
 change up.
+
+Or skip the setup entirely and see it working against a hundred-odd rules:
+
+```bash
+pnpm playground     # a real Chrome, the extension loaded, the rule set seeded
+```
+
+<img src="docs/screenshots/popup.png" alt="The Decoy popup: the master switch, the page-scope strip and the rule list" width="420" />
 
 ## How it works
 
@@ -73,6 +90,10 @@ rules; the page owns the decision.
   the service worker and the UI. The injected bundle is 12 kB minified as a result.
 - **`apps/extension`** — the MV3 surfaces: service worker, content bridge, injected script, and a
   React 19 + Vite + Tailwind 4 + shadcn UI shared by the popup and the full tab.
+- **`playground`** — the behavioural test suite, which is also a page you can open and click
+  through. No build step and no framework: it is the thing you reach for when the extension is
+  misbehaving, and a bundler between you and it would be exactly the wrong complexity in that
+  moment. See [Testing](#testing).
 
 The service worker builds as three separate single-file IIFE bundles, because Chrome loads them
 without a module loader and the injected script has to run at `document_start`.
@@ -94,6 +115,8 @@ So the panel mounts the same UI into the page instead, via `chrome.scripting` on
 React bundle has no business loading on every page anyone visits). It is draggable by its header,
 resizable from any edge, rounded, and remembers where you left it. Injecting it a second time takes
 it away, which is how one toolbar button toggles it.
+
+![The floating panel over a live page, in its own shadow root](docs/screenshots/floating-panel.png)
 
 Living inside someone else's document costs four things that the popup gets for free, and all four
 are handled rather than hoped about:
@@ -141,6 +164,8 @@ match:  /api/profile · POST · body json  user.role  equals  admin
 then:   respond 403
 ```
 
+![The rule editor with a condition on a json path](docs/screenshots/conditions.png)
+
 Every other POST to the same url is left alone. Conditions are evaluated in the page, after the
 url and method have already matched, so the cost only lands on requests that got that far. A rule
 with no conditions behaves exactly as it did before conditions existed.
@@ -171,6 +196,16 @@ Some deliberate decisions worth knowing:
   mock an endpoint that is not supposed to end. Over `fetch` it is a real `ReadableStream`; over
   XHR the chunks surface as `progress` events with `responseText` growing underneath them, and a
   `xhr.timeout` still cuts off a body that had already started arriving.
+
+  ![The stream editor, showing each chunk and what it becomes on the wire](docs/screenshots/stream-editor.png)
+- **A handler is real JavaScript, in every shape people write it.** A bare body of statements is
+  the documented form and can `await`; so can `async (req, res) => …`, `export default async
+  function handler(req, res) {…}` and `module.exports = function (req, res) {…};`. Someone who has
+  written a route handler before should be able to paste one, and meeting them with
+  `SyntaxError: Unexpected token 'export'` teaches nothing about a tool whose selling point is that
+  it takes real code.
+
+  ![The handler editor, with syntax highlighting and a runner beside it](docs/screenshots/handler-editor.png)
 - **A capture on disk can be played back without being retyped.** Load or drop a file into the
   chunk list and it is split where the format frames it -- an SSE event at the blank line that
   ends it, an ndjson record per line, text per line with the newline kept -- so playing it back
@@ -192,6 +227,10 @@ Some deliberate decisions worth knowing:
   payload, and the response headers — so "what did my app send?" does not send you back to the
   DevTools network panel. Payloads are capped at 64 kB for capture; the real request is
   unaffected.
+
+  ![The traffic log: every request, with the rule that decided it](docs/screenshots/traffic.png)
+
+  ![A request's detail sheet: request headers, payload and response headers](docs/screenshots/traffic-detail.png)
 - **Each rule shows how many times it has fired**, so "is this thing even doing anything?" is
   answered by the list rather than by guesswork. Counts live in session storage and survive an
   MV3 worker restart; the toolbar badge shows the mocked count for the active tab.
@@ -235,6 +274,8 @@ the legibility floor.
 - **Both themes ship**, following the OS, with an in-app override in the header. `pnpm e2e` with
   `E2E_SCREENSHOT_DIR` set renders every surface in both so a change can be reviewed rather than
   assumed.
+
+  ![The same workspace in the dark theme](docs/screenshots/workspace-dark.png)
 
 Tokens live in `src/ui/styles.css` as CSS variables mapped into Tailwind's theme, so a palette
 change is one file. `eyebrow`, `helper`, `tabular` and `hit-28` are custom utilities.
@@ -308,48 +349,104 @@ false badge on a working rule is worse than staying quiet. The match tester answ
 question from the other direction: paste a url and it names the rule that wins, not merely whether
 this one matches.
 
+![A rule flagged as never firing, with a button to move it above the rule shadowing it](docs/screenshots/shadow-detection.png)
+
 ## Testing
 
 ```bash
 pnpm typecheck                              # every package
-pnpm test                                   # 138 unit tests
+pnpm test                                   # 211 unit tests
 pnpm --filter @mocksmith/extension contrast # the palette's contrast floors
-pnpm --filter @mocksmith/extension e2e      # 37 end-to-end checks in a real Chrome
+pnpm playground                             # the playground, in a real Chrome, rules seeded
+pnpm --filter @mocksmith/extension e2e      # 242 checks, headless
 ```
 
-The unit tests cover the matcher, the response planner, config validation, shadow detection, the
-page-scope summary and the editor's rule transforms. The E2E run is the one that matters for the interceptor: it launches a real Chrome with
-the built extension loaded, seeds a rule set through `chrome.storage.local`, serves a fixture page
-over http, and asserts real behaviour from inside that page — status and header synthesis, rule
-ordering, delays, aborts mid-delay, hung requests, 204 body handling, the full XHR `readyState`
-lifecycle, handlers attached after `send()`, `responseType` variants, emulated client timeouts,
-instance reuse, and passthrough. Conditions get their own scenarios — a json payload gate, a header
-gate, a cookie gate, `any` mode, and an XHR `send()` body — each asserting both that the matching
-call is intercepted and that the near-identical non-matching call is not.
+There are two layers, and the split is on purpose. Unit tests cover what is pure — the matcher, the
+response planner, config validation, shadow detection, handler compilation, the page-scope summary
+and the editor's rule transforms. Everything else is behaviour in a real browser, and that lives in
+**the playground**.
 
-Streams are checked the same way, because "arrived in pieces" is not something a unit test can
-observe: an SSE rule is read chunk by chunk through a `ReadableStream` and asserted to take more
-than one read, an ndjson rule is asserted to compact and repeat, an endless rule is read past the
-end of its own chunk list and then aborted, and an XHR stream is asserted to expose a partial
-`responseText` across several `readyState === 3` ticks.
+### The playground
 
-It then loads the extension's own UI and checks that the rules and the traffic those scenarios
-produced both render — and finally injects the **floating panel** into a real page and asserts the
-things only a real browser can answer: that the shadow root mounts, that a colour token declared on
-`:host` actually resolves inside it, that the corners stay rounded, that the rule editor rendered
-rather than a stack of unstyled boxes, and that a second toggle takes it away again.
+`playground/` is a page that exercises every request shape Decoy can answer, against a real server,
+with the real extension loaded. It is one artefact with two ways in:
+
+```bash
+pnpm playground                             # opens it, with the rule set already seeded
+pnpm --filter @mocksmith/extension e2e      # runs the same cases headless, and asserts
+```
+
+`pnpm playground` launches a Chrome with the built extension, seeds the 167 rules the cases expect,
+and opens two tabs — the playground and Decoy's own workspace — so you can change a rule in one and
+watch it take effect in the other. There are four surfaces: **Test cases**, **Rule set** (what is
+seeded, and what is missing), **Request bench** (one request, any method, headers and body, over
+`fetch` or either flavour of XHR), and **Generate traffic** (bursts, trickles, oversized payloads —
+for watching the traffic log rather than asserting on it).
+
+![The playground's test cases, filtered and run](docs/screenshots/playground-cases.png)
+
+![The playground's rule set, showing which rules are seeded](docs/screenshots/playground-rules.png)
+
+198 cases in ten suites:
+
+| Suite | What it pins down |
+| --- | --- |
+| **wiring** | the config reaches the page, the rule set is seeded, 60 concurrent calls never cross |
+| **match** | all six url modes with a near-miss each, case sensitivity, methods, first-match-wins, shadowing |
+| **respond** | every status class, reason phrases, header repeats, all three body types, delays |
+| **cond** | five sources × eleven operators, `all`/`any`, and every body shape the page can serialize |
+| **stream** | sse/ndjson/text framing, intervals, repeats, endless streams, and the same over XHR |
+| **fail** | `failed` / `timeout` / `aborted`, abort reasons, `AbortSignal.timeout`, xhr timeouts |
+| **handler** | the whole `req`/`res` contract, `next()`, `store`, four source shapes, and five ways to crash |
+| **fetch** | Request and URL inputs, the Response surface, clone, readers, concurrency, cross-origin |
+| **xhr** | readyState and event order, every `responseType`, sync requests, instance reuse |
+| **limits** | what is deliberately *not* intercepted — images, css, EventSource, WebSocket, workers, beacons |
+
+Three properties make it worth trusting rather than just running:
+
+- **Every case is independent and re-runnable.** Anything stateful is keyed by a nonce or cleaned
+  up after, so clicking a case twice gives the same answer, and so does running the list in any
+  order. A case that hangs is cut off by a watchdog rather than taking the run with it.
+- **A missing rule skips; it does not fail.** The page reads the live config off the bridge — which
+  a page can do, and which is documented under [Security notes](#security-notes) — so a case whose
+  rule was never seeded says *not seeded* instead of *broken*. Red always means a regression.
+- **Negative cases everywhere.** Almost every case asserts both halves: that the matching request
+  was intercepted *and* that the near-identical one reached the network. A rule that matched
+  everything would satisfy only the first.
+
+The limits suite is the unusual one. Each case puts a rule on a url and then proves the real
+resource still loaded — a real 1×1 png, a real stylesheet whose value is read back out of
+`getComputedStyle`, a real event stream, a real WebSocket echo, a real worker fetch, a beacon the
+fixture server confirms receiving. Nothing in [Known limits](#known-limits) is a promise; all of it
+is a test that would turn red the day a layer started covering it.
+
+### The end-to-end run
+
+`pnpm e2e` runs all 198 playground cases headless and then keeps going, into the parts only a real
+browser can answer: it loads the extension's own UI and checks that the rules and the traffic those
+cases produced both render, that **Mock this** seeds a rule that survives validation, that a
+dropped-in capture splits into one chunk per record, that the rule lifecycle — create, rename, save,
+duplicate, reorder, disable, delete, undo — writes through the worker and comes back. Finally it
+injects the **floating panel** into a live page and asserts the things a shadow root makes fragile:
+that it mounts, that a colour token declared on `:host` resolves inside it, that the corners stay
+rounded, that the detail sheet lands inside the shadow root rather than in the page, and that a
+second toggle takes it away again.
 
 > **E2E needs a Chrome for Testing build.** Chrome 137+ ignores `--load-extension` on the stable
 > channel, so an installed Chrome cannot load an unpacked extension from the command line. The
 > script finds a build already cached by Playwright or Puppeteer; otherwise run
-> `npx playwright install chromium`, or set `CHROME_PATH`.
+> `npx playwright install chromium`, or set `CHROME_PATH`. `pnpm playground` needs the same build,
+> and says so — with instructions for using a Chrome you already have instead.
 >
 > `E2E_HEADED=1` watches it happen. `E2E_SCREENSHOT_DIR=./shots` writes PNGs of each UI surface in
 > both themes — including the states nothing else exercises: a shadowed rule, the paused list, first
 > run, the match-mode listbox open, the stream editor, the body fields view, the method multi-select
 > open, a dirty editor with its unsaved-changes bar, and the floating panel over a live page.
 
-`fixtures/index.html` is also a manual harness: serve it, load the extension, click **Run checks**.
+The playground page is served under a deliberately hostile content security policy — `script-src
+'self'` with no `unsafe-eval`, and `frame-src 'self'` — because that is what a hardened app looks
+like, and handlers have to work inside one. Every handler case is therefore also a test that the
+sandbox architecture is doing its job.
 
 ## Known limits
 
@@ -420,3 +517,28 @@ Ordered by how much each unblocks:
    add and activate rules, and read the traffic log, while driving a browser.
 8. **Layer 3 (`chrome.debugger`)** — opt-in deep mode for true status + body control over any
    resource type, with a clear fallback when DevTools is already attached.
+
+## Contributing
+
+```bash
+pnpm install
+pnpm check                                  # format, lint, typecheck and unit tests
+pnpm build && pnpm e2e                      # the browser run
+```
+
+`pnpm check` is exactly what CI runs for the static jobs, so a clean local run is a clean CI run.
+Formatting is Prettier's and linting is ESLint's; neither is negotiated in review. Markdown is
+deliberately outside the formatter — the prose is wrapped by hand at the width it reads best.
+
+Two conventions worth knowing before the first pull request:
+
+- **Comments say why, not what.** The code says what it does. A comment earns its place by
+  recording the decision behind it — the thing the next reader would otherwise have to rediscover
+  by breaking it.
+- **Behaviour goes in the playground, not in a new harness.** A change to what Decoy does gets a
+  case in `playground/suites/`, which makes it both a CI assertion and something a person can click.
+  See [playground/README.md](playground/README.md).
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).

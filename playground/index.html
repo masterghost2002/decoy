@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Decoy playground</title>
+    <link rel="stylesheet" href="./playground.css" />
+    <!-- Classic and first, so window.__decoyPlayground exists before the modules run. -->
+    <script src="/config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead-line">
+        <h1>Decoy playground</h1>
+        <p class="lede">
+          Every request shape Decoy can answer, exercised against a real page and a real server.
+        </p>
+      </div>
+      <div class="status" id="status" role="status" aria-live="polite">
+        <span class="status-dot" data-state="unknown"></span>
+        <span class="status-text">looking for the extension…</span>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Playground sections">
+      <button type="button" role="tab" data-tab="cases" aria-selected="true">Test cases</button>
+      <button type="button" role="tab" data-tab="rules" aria-selected="false">Rule set</button>
+      <button type="button" role="tab" data-tab="bench" aria-selected="false">Request bench</button>
+      <button type="button" role="tab" data-tab="generate" aria-selected="false">
+        Generate traffic
+      </button>
+    </nav>
+
+    <main>
+      <!-- ---------------------------------------------------------------- -->
+      <section id="panel-cases" class="panel" data-panel="cases">
+        <div class="toolbar">
+          <button type="button" id="run-all" class="primary">Run all</button>
+          <button type="button" id="run-failed" disabled>Re-run failures</button>
+          <button type="button" id="stop" disabled>Stop</button>
+          <label class="field">
+            <span class="eyebrow">Filter</span>
+            <input
+              type="search"
+              id="filter"
+              placeholder="name, suite or rule id — press /"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <label class="check">
+            <input type="checkbox" id="hide-passing" />
+            <span>Hide passing</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="skip-slow" />
+            <span>Skip timing cases</span>
+          </label>
+        </div>
+
+        <div class="summary" id="summary">
+          <span class="tally" data-kind="pass">0 passed</span>
+          <span class="tally" data-kind="fail">0 failed</span>
+          <span class="tally" data-kind="skip">0 skipped</span>
+          <span class="tally" data-kind="time">—</span>
+          <span class="progress" id="progress"></span>
+        </div>
+
+        <div id="suites"></div>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <section id="panel-rules" class="panel" data-panel="rules" hidden>
+        <div class="toolbar">
+          <button type="button" id="copy-rules" class="primary">Copy the seeding snippet</button>
+          <button type="button" id="copy-json">Copy the rules as JSON</button>
+          <span class="helper" id="copy-note"></span>
+        </div>
+        <div class="prose">
+          <p>
+            The playground needs its rule set in the extension before anything below the wiring
+            suite can pass. <code>pnpm playground</code> seeds it for you. To seed it into a Chrome
+            you are already using: open the extension's own page, and paste the snippet above into
+            its DevTools console.
+          </p>
+        </div>
+        <div id="rules-diff"></div>
+        <div id="rules-list"></div>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <section id="panel-bench" class="panel" data-panel="bench" hidden>
+        <div class="prose">
+          <p>
+            One request, with whatever you want on it. Useful for trying a rule you are in the
+            middle of writing — change it in the extension, press Send here, and read what came
+            back.
+          </p>
+        </div>
+        <form class="bench" id="bench">
+          <label class="field">
+            <span class="eyebrow">Method</span>
+            <select id="bench-method">
+              <option>GET</option>
+              <option>POST</option>
+              <option>PUT</option>
+              <option>PATCH</option>
+              <option>DELETE</option>
+              <option>HEAD</option>
+              <option>OPTIONS</option>
+            </select>
+          </label>
+          <label class="field grow">
+            <span class="eyebrow">Url</span>
+            <input type="text" id="bench-url" value="/pg/echo?hello=1" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span class="eyebrow">Transport</span>
+            <select id="bench-transport">
+              <option value="fetch">fetch</option>
+              <option value="xhr">XMLHttpRequest</option>
+              <option value="xhr-sync">XMLHttpRequest (sync)</option>
+            </select>
+          </label>
+          <label class="field grow">
+            <span class="eyebrow">Headers — one per line, name: value</span>
+            <textarea id="bench-headers" rows="3" spellcheck="false">X-Env: staging</textarea>
+          </label>
+          <label class="field grow">
+            <span class="eyebrow">Body</span>
+            <textarea id="bench-body" rows="3" spellcheck="false"></textarea>
+          </label>
+          <div class="bench-actions">
+            <button type="submit" class="primary">Send</button>
+            <button type="button" id="bench-repeat">Send ten times</button>
+          </div>
+        </form>
+        <div id="bench-out" class="bench-out"></div>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <section id="panel-generate" class="panel" data-panel="generate" hidden>
+        <div class="prose">
+          <p>
+            Traffic for the extension's own panels to display. Nothing here asserts anything — open
+            Decoy next to it and watch the traffic log, the per-rule fired counts and the toolbar
+            badge.
+          </p>
+        </div>
+        <div class="cards" id="generators"></div>
+        <pre class="log" id="generate-log" aria-live="polite"></pre>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        <code>pnpm playground</code> launches this with the extension loaded and the rule set
+        seeded. <code>pnpm --filter @mocksmith/extension e2e</code> runs the same cases headless.
+      </p>
+    </footer>
+  </body>
+</html>

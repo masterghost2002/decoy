@@ -146,7 +146,7 @@ function parseDocument(text: string, mimeType: string): Document | null {
       : '';
   if (type === '') return null;
   try {
-    const parsed = new DOMParser().parseFromString(text, type as DOMParserSupportedType);
+    const parsed = new DOMParser().parseFromString(text, type);
     return parsed.querySelector('parsererror') === null ? parsed : null;
   } catch {
     return null;
@@ -183,7 +183,7 @@ function applyResponseBody(
 
   switch (responseType) {
     case 'json': {
-      let parsed: unknown = null;
+      let parsed: unknown;
       try {
         parsed = JSON.parse(text);
       } catch {
@@ -555,10 +555,17 @@ export function installXhrPatch(context: XhrPatchContext): void {
   if (typeof XMLHttpRequest !== 'function') return;
 
   const proto = XMLHttpRequest.prototype;
+  /*
+   * Capturing the prototype methods unbound is exactly what a patch has to do:
+   * every one of them is called back with `.call(this)` or `.apply(this)` on
+   * the instance it came from.
+   */
+  /* eslint-disable @typescript-eslint/unbound-method */
   const nativeOpen = proto.open;
   const nativeSend = proto.send;
   const nativeAbort = proto.abort;
   const nativeSetRequestHeader = proto.setRequestHeader;
+  /* eslint-enable @typescript-eslint/unbound-method */
 
   // `open` is overloaded (2-arg and 5-arg). Taking a loose tuple and forwarding
   // it verbatim keeps the platform's own defaulting for `async` intact.
@@ -594,8 +601,8 @@ export function installXhrPatch(context: XhrPatchContext): void {
       reportTerminal: null,
     });
 
-    (nativeOpen as (...rest: OpenArgs) => void).apply(this, args);
-  } as XMLHttpRequest['open'];
+    nativeOpen.apply(this, args as Parameters<typeof nativeOpen>);
+  };
 
   proto.setRequestHeader = function setRequestHeader(
     this: XMLHttpRequest,
@@ -617,6 +624,14 @@ export function installXhrPatch(context: XhrPatchContext): void {
     }
 
     state.startedAt = Date.now();
+    /*
+     * `send()` starts a fresh request lifecycle, so a latched abort from before
+     * it must not survive into it. The platform allows `abort()` on an opened
+     * request that was never sent -- it is a no-op there -- and a flag left
+     * standing would silently swallow every event of the send that follows,
+     * wedging the instance for good.
+     */
+    state.aborted = false;
 
     const buildFacts = (): RequestFacts => {
       // Rebuilt at decision time: headers can still be set between `open()`
